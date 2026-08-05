@@ -18,6 +18,7 @@ export default function ShoppingList({ user }) {
   const [modalStoreName, setModalStoreName] = useState('')
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('urgencia') // urgencia | frequencia
+  const [supportsPurchaseExtras, setSupportsPurchaseExtras] = useState(null)
 
   async function loadAll() {
     setLoading(true)

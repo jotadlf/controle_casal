@@ -53,14 +53,23 @@ export default function Calendar() {
       }
     })
 
-    // tarefas com due_date (tentar parse robusto)
+    // tarefas com due_date (tentar parse robusto e manter a data local)
     tasks.forEach((t) => {
       if (!t.due_date) return
-      let d = new Date(t.due_date)
-      if (isNaN(d.getTime())) {
-        // tentar truncar para yyyy-mm-dd
-        const s = String(t.due_date).slice(0, 10)
-        d = new Date(s)
+      let d
+      const raw = String(t.due_date)
+      const localDateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+      if (localDateMatch) {
+        d = new Date(Number(localDateMatch[1]), Number(localDateMatch[2]) - 1, Number(localDateMatch[3]))
+      } else {
+        d = new Date(raw)
+        if (isNaN(d.getTime())) {
+          const s = raw.slice(0, 10)
+          const match = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+          if (match) {
+            d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+          }
+        }
       }
       if (isNaN(d.getTime())) return
       if (d.getFullYear() === year && d.getMonth() === month) {
