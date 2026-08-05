@@ -55,7 +55,7 @@ export default function ShoppingList({ user }) {
     if (!query) return []
 
     return enriched
-      .filter((item) => item.name.toLowerCase().includes(query))
+      .filter((item) => String(item.name).toLowerCase().includes(query))
       .sort((a, b) => {
         const aCount = a.analysis.timesBought ?? 0
         const bCount = b.analysis.timesBought ?? 0
@@ -81,12 +81,12 @@ export default function ShoppingList({ user }) {
   const sorted = useMemo(() => {
     const copy = [...enriched]
     return copy.sort((a, b) => {
-      const aBought = purchases.some((p) => p.item_id === a.id && p.purchased_at === today)
-      const bBought = purchases.some((p) => p.item_id === b.id && p.purchased_at === today)
+      const aBought = purchases.some((p) => p.item_id === a.id)
+      const bBought = purchases.some((p) => p.item_id === b.id)
       if (aBought !== bBought) return aBought ? 1 : -1
       return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
     })
-  }, [enriched, purchases, today])
+  }, [enriched, purchases])
 
   const sessionTotal = useMemo(() => {
     if (!shoppingSessionId) return 0
@@ -321,10 +321,11 @@ export default function ShoppingList({ user }) {
             <input
               value={newName}
               onChange={(e) => {
-                setNewName(e.target.value)
-                setShowSuggestions(true)
+                const value = e.target.value
+                setNewName(value)
+                setShowSuggestions(Boolean(value.trim()))
               }}
-              onFocus={() => setShowSuggestions(true)}
+              onFocus={() => setShowSuggestions(Boolean(newName.trim()))}
               onKeyDown={(e) => e.key === 'Enter' && addItem()}
               placeholder="Adicionar item"
               className="w-full rounded-full border border-line px-4 py-2 text-sm bg-white focus:border-teal outline-none"
