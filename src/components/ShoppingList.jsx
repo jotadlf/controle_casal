@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Check, Trash2, TrendingUp } from 'lucide-react'
+import { Plus, Check, Trash2, TrendingUp, X } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { analyzeItem, urgencyLabel } from '../lib/predict'
 import { currentReferenceMonth } from '../lib/bills'
@@ -19,6 +19,7 @@ export default function ShoppingList({ user }) {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('urgencia') // urgencia | frequencia
   const [supportsPurchaseExtras, setSupportsPurchaseExtras] = useState(null)
+  const [alert, setAlert] = useState(null)
 
   async function loadAll() {
     setLoading(true)
@@ -115,9 +116,7 @@ export default function ShoppingList({ user }) {
     // evitar duplicatas: mesma item_id e mesma data
     const exists = purchases.find((p) => p.item_id === item.id && p.purchased_at === today)
     if (exists) {
-      // já marcado hoje
-      // eslint-disable-next-line no-alert
-      alert('Item já marcado como comprado hoje.')
+      setAlert({ type: 'warning', message: 'Item já marcado como comprado hoje.' })
       setPurchaseTarget(null)
       return
     }
@@ -147,14 +146,12 @@ export default function ShoppingList({ user }) {
       data = retry.data
       error = retry.error
       if (!error) {
-        // eslint-disable-next-line no-alert
-        alert('Item marcado como comprado. Preço/quantidade não foram salvos porque a tabela não tem esses campos.')
+        setAlert({ type: 'info', message: 'Item marcado como comprado. Preço/quantidade não foram salvos porque a tabela não tem esses campos.' })
       }
     }
 
     if (error) {
-      // eslint-disable-next-line no-alert
-      alert(`Erro ao salvar compra: ${error.message}`)
+      setAlert({ type: 'error', message: `Erro ao salvar compra: ${error.message}` })
     } else if (data) {
       setPurchases((prev) => [...prev, data])
     }
@@ -231,6 +228,24 @@ export default function ShoppingList({ user }) {
           <p className="text-sm text-ink/60">Previsão automática baseada no histórico de compras.</p>
         </div>
       </div>
+      {alert && (
+        <div className={`rounded-card border px-4 py-3 text-sm flex items-start justify-between gap-3 ${
+          alert.type === 'error'
+            ? 'bg-coral/10 border-coral text-coral'
+            : alert.type === 'warning'
+            ? 'bg-amber/10 border-amber text-amber'
+            : 'bg-teal/10 border-teal text-teal'
+        }`}>
+          <span>{alert.message}</span>
+          <button
+            onClick={() => setAlert(null)}
+            className="rounded-full p-1 text-current hover:bg-black/5 transition-colors"
+            aria-label="Fechar alerta"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-2 items-center">
         <div className="flex-1 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -243,7 +258,7 @@ export default function ShoppingList({ user }) {
           ) : (
             <button
               onClick={() => setShowSessionModal(true)}
-              className="rounded-full px-3 py-1 text-xs bg-teal text-white hover:bg-teal-dark transition-colors"
+              className="rounded-full px-3 py-1 text-xs bg-amber text-white hover:bg-amber-dark transition-colors"
             >
               Iniciar Compras
             </button>
