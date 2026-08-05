@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, MessageCircle, Send } from 'lucide-react'
+import { Plus, Trash2, MessageCircle, Send, X } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { EmptyState } from './ShoppingList'
 import { USERS } from './UserSwitch'
@@ -33,10 +33,14 @@ export default function Tasks({ user }) {
     due_date: '',
   })
   const [filter, setFilter] = useState('todos')
+  const [alert, setAlert] = useState(null)
 
   async function loadAll() {
     setLoading(true)
-    const { data } = await supabase.from('repair_requests').select('*').order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('repair_requests').select('*').order('id', { ascending: false })
+    if (error) {
+      console.error('Falha ao carregar tarefas:', error)
+    }
     setRequests(data || [])
     setLoading(false)
   }
@@ -65,24 +69,60 @@ export default function Tasks({ user }) {
 
   async function addRequest() {
     if (!form.title.trim()) return
-    const { data, error } = await supabase
-      .from('repair_requests')
-      .insert({
-        title: form.title.trim(),
-        description: form.description.trim(),
-        priority: form.priority,
-        status: 'pendente',
-        requested_by: user,
-        assigned_to: form.assigned_to || null,
-        category: form.category || 'Outro',
-        due_date: form.due_date || null,
+
+    const basePayload = {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      priority: form.priority,
+      status: 'pendente',
+      requested_by: user,
+    }
+
+    const enrichPayload = (payload) => {
+      if (form.assigned_to) payload.assigned_to = form.assigned_to
+      if (form.category) payload.category = form.category
+      if (form.due_date) payload.due_date = form.due_date
+      return payload
+    }
+
+    const tryInsert = async (payload) =>
+      supabase.from('repair_requests').insert(payload).select().single()
+
+    let payload = enrichPayload({ ...basePayload })
+    let { data, error } = await tryInsert(payload)
+
+    const isMissingColumnError = (message) =>
+      /could not find the '(assigned_to|category|due_date)' column of 'repair_requests' in the schema cache|column .* does not exist/i.test(message)
+
+    if (error && isMissingColumnError(error.message)) {
+      const retry = await tryInsert({ ...basePayload })
+      data = retry.data
+      error = retry.error
+      if (!error) {
+        setAlert({
+          type: 'info',
+          message:
+            'Tarefa criada. Alguns campos extras não foram salvos porque o backend não tem essas colunas.',
+        })
+      }
+    }
+
+    if (error) {
+      console.error('Erro ao criar tarefa:', error)
+      setAlert({
+        type: 'error',
+        message: `Falha ao criar tarefa: ${error.message}`,
       })
-      .select()
-      .single()
-    if (!error && data) {
+      return
+    }
+
+    if (data) {
       setRequests((prev) => [data, ...prev])
       setForm({ title: '', description: '', priority: 'baixa', assigned_to: '', category: 'Casa', due_date: '' })
       setShowForm(false)
+      if (!alert || alert.type !== 'info') {
+        setAlert({ type: 'info', message: 'Tarefa criada com sucesso.' })
+      }
     }
   }
 
@@ -128,6 +168,24 @@ export default function Tasks({ user }) {
             <Plus size={16} /> Nova tarefa
           </button>
         </div>
+      {alert && (
+        <div className={`rounded-card border px-4 py-3 text-sm flex items-start justify-between gap-3 ${
+          alert.type === 'error'
+            ? 'bg-coral/10 border-coral text-coral'
+            : alert.type === 'warning'
+            ? 'bg-amber/10 border-amber text-amber'
+            : 'bg-teal/10 border-teal text-teal'
+        }`}>
+          <span>{alert.message}</span>
+          <button
+            onClick={() => setAlert(null)}
+            className="rounded-full p-1 text-current hover:bg-black/5 transition-colors"
+            aria-label="Fechar alerta"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {showForm && (
         <div className="bg-white border border-line rounded-card p-4 space-y-3">

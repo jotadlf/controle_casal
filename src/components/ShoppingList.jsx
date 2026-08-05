@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Check, Trash2, TrendingUp, X } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { analyzeItem, urgencyLabel } from '../lib/predict'
@@ -17,9 +17,10 @@ export default function ShoppingList({ user }) {
   const [purchaseTarget, setPurchaseTarget] = useState(null)
   const [modalStoreName, setModalStoreName] = useState('')
   const [loading, setLoading] = useState(true)
-  const [sortBy, setSortBy] = useState('urgencia') // urgencia | frequencia
   const [supportsPurchaseExtras, setSupportsPurchaseExtras] = useState(null)
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const [alert, setAlert] = useState(null)
+  const inputContainerRef = useRef(null)
 
   async function loadAll() {
     setLoading(true)
@@ -49,21 +50,43 @@ export default function ShoppingList({ user }) {
     })
   }, [items, purchases])
 
+  const suggestions = useMemo(() => {
+    const query = newName.trim().toLowerCase()
+    if (!query) return []
+
+    return enriched
+      .filter((item) => item.name.toLowerCase().includes(query))
+      .sort((a, b) => {
+        const aCount = a.analysis.timesBought ?? 0
+        const bCount = b.analysis.timesBought ?? 0
+        if (aCount !== bCount) return bCount - aCount
+        return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+      })
+      .slice(0, 5)
+  }, [enriched, newName])
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (inputContainerRef.current && !inputContainerRef.current.contains(event.target)) {
+        setShowSuggestions(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const today = new Date().toISOString().slice(0, 10)
+
   const sorted = useMemo(() => {
     const copy = [...enriched]
-    if (sortBy === 'urgencia') {
-      copy.sort((a, b) => {
-        const da = a.analysis.daysLeft
-        const db = b.analysis.daysLeft
-        if (da === null) return 1
-        if (db === null) return -1
-        return da - db
-      })
-    } else {
-      copy.sort((a, b) => b.analysis.timesBought - a.analysis.timesBought)
-    }
-    return copy
-  }, [enriched, sortBy])
+    return copy.sort((a, b) => {
+      const aBought = purchases.some((p) => p.item_id === a.id && p.purchased_at === today)
+      const bBought = purchases.some((p) => p.item_id === b.id && p.purchased_at === today)
+      if (aBought !== bBought) return aBought ? 1 : -1
+      return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+    })
+  }, [enriched, purchases, today])
 
   const sessionTotal = useMemo(() => {
     if (!shoppingSessionId) return 0
@@ -96,7 +119,40 @@ export default function ShoppingList({ user }) {
     if (!error && data) {
       setItems((prev) => [...prev, data])
       setNewName('')
+      setShowSuggestions(false)
     }
+  }
+
+  async function activateSuggestion(item) {
+    if (item.on_list) {
+      setAlert({ type: 'info', message: 'Item já está na lista.' })
+      setNewName('')
+      setShowSuggestions(false)
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('shopping_items')
+      .update({ on_list: true })
+      .eq('id', item.id)
+      .select()
+      .single()
+
+    if (error) {
+      if (/column .* does not exist/i.test(error.message)) {
+        setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, on_list: true } : i)))
+        setAlert({ type: 'warning', message: 'Item reativado localmente; campo on_list não existe no backend.' })
+      } else {
+        setAlert({ type: 'error', message: `Não foi possível reativar item: ${error.message}` })
+        return
+      }
+    } else if (data) {
+      setItems((prev) => prev.map((i) => (i.id === item.id ? data : i)))
+      setAlert({ type: 'info', message: 'Item reativado na lista.' })
+    }
+
+    setNewName('')
+    setShowSuggestions(false)
   }
 
   async function removeItem(id) {
@@ -263,13 +319,36 @@ export default function ShoppingList({ user }) {
               Iniciar Compras
             </button>
           )}
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addItem()}
-            placeholder="Adicionar item"
-            className="flex-1 rounded-full border border-line px-4 py-2 text-sm bg-white focus:border-teal outline-none"
-          />
+          <div ref={inputContainerRef} className="relative flex-1">
+            <input
+              value={newName}
+              onChange={(e) => {
+                setNewName(e.target.value)
+                setShowSuggestions(true)
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onKeyDown={(e) => e.key === 'Enter' && addItem()}
+              placeholder="Adicionar item"
+              className="w-full rounded-full border border-line px-4 py-2 text-sm bg-white focus:border-teal outline-none"
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute left-0 right-0 mt-1 z-10 rounded-card border border-line bg-white shadow-xl overflow-hidden">
+                {suggestions.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => activateSuggestion(item)}
+                    className="w-full text-left px-4 py-3 text-sm text-ink hover:bg-teal-light transition-colors"
+                  >
+                    <div className="font-medium truncate">{item.name}</div>
+                    {item.analysis.timesBought > 0 && (
+                      <div className="text-[11px] text-ink/50 mt-0.5">{item.analysis.timesBought}x comprado</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <button
           onClick={addItem}
@@ -280,20 +359,6 @@ export default function ShoppingList({ user }) {
         </button>
       </div>
 
-      <div className="flex gap-2 text-xs">
-        <button
-          onClick={() => setSortBy('urgencia')}
-          className={`px-3 py-1 rounded-full border ${sortBy === 'urgencia' ? 'bg-teal text-white border-teal' : 'border-line text-ink/60'}`}
-        >
-          Mais urgente
-        </button>
-        <button
-          onClick={() => setSortBy('frequencia')}
-          className={`px-3 py-1 rounded-full border ${sortBy === 'frequencia' ? 'bg-teal text-white border-teal' : 'border-line text-ink/60'}`}
-        >
-          Mais consumidos
-        </button>
-      </div>
 
       {loading ? (
         <p className="text-sm text-ink/50">Carregando...</p>

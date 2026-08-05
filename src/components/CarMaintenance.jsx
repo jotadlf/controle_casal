@@ -23,11 +23,134 @@ export default function CarMaintenance({ user }) {
     description: '',
   })
 
+  const formatLocalDate = (date) => {
+    if (!date) return ''
+    const [year, month, day] = String(date).split('-')
+    return new Date(Number(year), Number(month) - 1, Number(day)).toLocaleDateString('pt-BR')
+  }
+
+  const getReferenceMonth = (date) => {
+    const [year, month] = String(date).split('-')
+    return `${year}-${String(month).padStart(2, '0')}-01`
+  }
+
+  const CAR_BILL_NAME = 'Gastos com Carro'
+  const CAR_BILL_CATEGORY = 'Carro'
+
+  async function ensureCarBill() {
+    const { data: billData, error: billError } = await supabase
+      .from('bills')
+      .select('*')
+      .eq('name', CAR_BILL_NAME)
+      .maybeSingle()
+
+    if (billError) {
+      console.error('Erro ao buscar conta de carro:', billError)
+    }
+
+    if (billData) return billData
+
+    const { data: createdBill, error: createError } = await supabase
+      .from('bills')
+      .insert({
+        name: CAR_BILL_NAME,
+        category: CAR_BILL_CATEGORY,
+        amount: 0,
+        due_day: 1,
+        active: true,
+      })
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('Erro ao criar conta de carro:', createError)
+      return null
+    }
+
+    return createdBill
+  }
+
+  async function syncCarBillForMonth(refMonth, expenses) {
+    const bill = await ensureCarBill()
+    if (!bill) return
+
+    const total = expenses.reduce((sum, entry) => sum + Number(entry.value ?? 0), 0)
+
+    if (total <= 0) {
+      const { data: payment, error: paymentError } = await supabase
+        .from('bill_payments')
+        .select('*')
+        .eq('bill_id', bill.id)
+        .eq('reference_month', refMonth)
+        .maybeSingle()
+
+      if (payment && !paymentError) {
+        await supabase.from('bill_payments').delete().eq('id', payment.id)
+      }
+
+      await supabase
+        .from('bills')
+        .update({ amount: 0 })
+        .eq('id', bill.id)
+
+      return
+    }
+
+    const { data: existingPayment, error: paymentError } = await supabase
+      .from('bill_payments')
+      .select('*')
+      .eq('bill_id', bill.id)
+      .eq('reference_month', refMonth)
+      .maybeSingle()
+
+    if (paymentError) {
+      console.error('Erro ao buscar pagamento de carro:', paymentError)
+    }
+
+    if (existingPayment) {
+      await supabase
+        .from('bill_payments')
+        .update({
+          amount: total,
+          paid: true,
+          paid_at: new Date().toISOString().slice(0, 10),
+          paid_by: user,
+        })
+        .eq('id', existingPayment.id)
+    } else {
+      await supabase.from('bill_payments').insert({
+        bill_id: bill.id,
+        reference_month: refMonth,
+        amount: total,
+        paid: true,
+        paid_at: new Date().toISOString().slice(0, 10),
+        paid_by: user,
+      })
+    }
+
+    await supabase
+      .from('bills')
+      .update({ amount: total })
+      .eq('id', bill.id)
+  }
+
+  async function syncCarBillFromEntries(entryDate, allEntries) {
+    const refMonth = getReferenceMonth(entryDate)
+    const monthExpenses = allEntries.filter((entry) => getReferenceMonth(entry.date) === refMonth)
+    await syncCarBillForMonth(refMonth, monthExpenses)
+  }
+
   async function loadAll() {
     setLoading(true)
     const { data } = await supabase.from('car_maintenance').select('*').order('date', { ascending: false })
-    setEntries(data || [])
+    const entriesData = data || []
+    setEntries(entriesData)
     setLoading(false)
+
+    if (entriesData.length > 0) {
+      const months = Array.from(new Set(entriesData.map((entry) => getReferenceMonth(entry.date))))
+      await Promise.all(months.map((month) => syncCarBillForMonth(month, entriesData.filter((entry) => getReferenceMonth(entry.date) === month))))
+    }
   }
 
   useEffect(() => {
@@ -51,15 +174,21 @@ export default function CarMaintenance({ user }) {
       .select()
       .single()
     if (!error && data) {
-      setEntries((prev) => [data, ...prev])
+      const newEntries = [data, ...entries]
+      setEntries(newEntries)
       setForm({ type: 'combustivel', date: new Date().toISOString().slice(0, 10), km: '', value: '', description: '' })
       setShowForm(false)
+      await syncCarBillFromEntries(data.date, newEntries)
     }
   }
 
   async function removeEntry(id) {
+    const removedEntry = entries.find((e) => e.id === id)
+    if (!removedEntry) return
     await supabase.from('car_maintenance').delete().eq('id', id)
-    setEntries((prev) => prev.filter((e) => e.id !== id))
+    const newEntries = entries.filter((e) => e.id !== id)
+    setEntries(newEntries)
+    await syncCarBillFromEntries(removedEntry.date, newEntries)
   }
 
   const total30d = entries
@@ -166,7 +295,7 @@ export default function CarMaintenance({ user }) {
                       {entry.description ? ` — ${entry.description}` : ''}
                     </p>
                     <p className="text-xs text-ink/40 font-mono">
-                      {new Date(entry.date).toLocaleDateString('pt-BR')}
+                      {formatLocalDate(entry.date)}
                       {entry.km ? ` · ${entry.km} km` : ''} · por {entry.created_by}
                     </p>
                   </div>
