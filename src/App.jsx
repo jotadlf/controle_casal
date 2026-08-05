@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ShoppingCart, Receipt, Car, ListChecks, Calendar as CalendarIcon } from 'lucide-react'
+import { ShoppingCart, Receipt, Car, ListChecks, Calendar as CalendarIcon, Users, Heart, Cat } from 'lucide-react'
 import UserSwitch, { useCurrentUser } from './components/UserSwitch'
 import ShoppingList from './components/ShoppingList'
 import Bills from './components/Bills'
@@ -32,7 +32,9 @@ export default function App() {
           <h1 className="font-display font-bold text-lg text-ink tracking-tight">
             Casa
             <span className="ml-3 inline-flex items-center gap-1" aria-hidden>
-              👩‍❤️‍👨🐱
+              <Users size={16} />
+              <Heart size={16} className="text-coral" />
+              <Cat size={16} />
             </span>
             <span className="text-teal">.</span>
           </h1>
