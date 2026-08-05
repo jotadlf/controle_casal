@@ -78,7 +78,7 @@ function NamePicker({ onPick }) {
         </h1>
         <p className="text-sm text-ink/60">Quem é você?</p>
         <div className="flex flex-col gap-2">
-          {['Jairon', 'Cônjuge'].map((name) => (
+          {['Jairon', 'Bruna'].map((name) => (
             <button
               key={name}
               onClick={() => onPick(name)}

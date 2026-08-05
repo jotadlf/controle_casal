@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 const KEY = 'casa-app:usuario'
-export const USERS = ['Jairon', 'Cônjuge']
+export const USERS = ['Jairon', 'Bruna']
 
 export function useCurrentUser() {
   const [user, setUser] = useState(() => localStorage.getItem(KEY) || '')
