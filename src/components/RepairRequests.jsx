@@ -12,11 +12,10 @@ const STATUS = [
 
 const PRIORITY = [
   { key: 'baixa', label: 'Baixa' },
-  { key: 'media', label: 'Média' },
   { key: 'alta', label: 'Alta' },
 ]
 
-const CATEGORIES = ['Reparo', 'Casa', 'Documento', 'Pessoal', 'Outro']
+const CATEGORY_OPTIONS = ['Casa', 'Trabalho', 'Pessoal']
 
 export default function Tasks({ user }) {
   const [requests, setRequests] = useState([])
@@ -28,9 +27,9 @@ export default function Tasks({ user }) {
   const [form, setForm] = useState({
     title: '',
     description: '',
-    priority: 'media',
+    priority: 'baixa',
     assigned_to: '',
-    category: 'Outro',
+    category: 'Casa',
     due_date: '',
   })
   const [filter, setFilter] = useState('todos')
@@ -157,17 +156,15 @@ export default function Tasks({ user }) {
                 {p.label}
               </button>
             ))}
-            {CATEGORIES.map((c) => (
-              <button
-                key={c}
-                onClick={() => setForm({ ...form, category: c })}
-                className={`px-3 py-1.5 rounded-full text-xs border ${
-                  form.category === c ? 'bg-ink text-white border-ink' : 'border-line text-ink/60'
-                }`}
-              >
-                {c}
-              </button>
-            ))}
+            <select
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              className="rounded-full border border-line px-3 py-1.5 text-xs bg-white"
+            >
+              {CATEGORY_OPTIONS.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
             <select
               value={form.assigned_to}
               onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}
