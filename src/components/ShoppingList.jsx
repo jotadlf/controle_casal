@@ -107,8 +107,6 @@ export default function ShoppingList({ user }) {
       maximumFractionDigits: 2,
     }).format(value)
 
-  const today = new Date().toISOString().slice(0, 10)
-
   async function addItem() {
     if (!newName.trim()) return
     const { data, error } = await supabase
