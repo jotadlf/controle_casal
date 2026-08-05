@@ -117,18 +117,72 @@ export default function ShoppingList({ user }) {
       setPurchaseTarget(null)
       return
     }
-    const payload = { item_id: item.id, purchased_at: today, purchased_by: user }
-    if (price) payload.price = Number(String(price).replace(',', '.'))
-    if (unit) payload.unit = unit
-    if (quantity > 0) payload.quantity = quantity
-    if (shoppingSessionId) payload.session_id = shoppingSessionId
-    const { data, error } = await supabase.from('shopping_purchases').insert(payload).select('*, shopping_sessions(store_name)').single()
+
+    const basePayload = { item_id: item.id, purchased_at: today, purchased_by: user }
+    if (shoppingSessionId) basePayload.session_id = shoppingSessionId
+
+    const addOptionalFields = (payload) => {
+      if (price) payload.price = Number(String(price).replace(',', '.'))
+      if (unit) payload.unit = unit
+      if (quantity > 0) payload.quantity = quantity
+      return payload
+    }
+
+    const tryInsert = async (payload) => {
+      return await supabase.from('shopping_purchases').insert(payload).select('*, shopping_sessions(store_name)').single()
+    }
+
+    let payload = addOptionalFields({ ...basePayload })
+    let { data, error } = await tryInsert(payload)
+
+    const isMissingColumnError = (message) =>
+      /could not find the '(price|unit|quantity)' column of 'shopping_purchases' in the schema cache|column .* does not exist/i.test(message)
+
+    const stripMissingFields = (message, currentPayload) => {
+      const missingFields = []
+      const fieldMatch = message.match(/(?:'(price|unit|quantity)' column of 'shopping_purchases'|column "(price|unit|quantity)" does not exist)/gi)
+      if (fieldMatch) {
+        fieldMatch.forEach((match) => {
+          const key = match.match(/price|unit|quantity/i)
+          if (key) missingFields.push(key[0].toLowerCase())
+        })
+      }
+      const newPayload = { ...basePayload }
+      if (price && !missingFields.includes('price')) newPayload.price = Number(String(price).replace(',', '.'))
+      if (unit && !missingFields.includes('unit')) newPayload.unit = unit
+      if (quantity > 0 && !missingFields.includes('quantity')) newPayload.quantity = quantity
+      return newPayload
+    }
+
+    while (error && isMissingColumnError(error.message)) {
+      const nextPayload = stripMissingFields(error.message, payload)
+      if (Object.keys(nextPayload).length === Object.keys(basePayload).length) {
+        break
+      }
+      payload = nextPayload
+      const retry = await tryInsert(payload)
+      data = retry.data
+      error = retry.error
+    }
+
+    if (error) {
+      // eslint-disable-next-line no-alert
+      alert(`Erro ao salvar compra: ${error.message}`)
+    } else if (data) {
+      if (!payload.price && !payload.unit && payload.quantity === undefined) {
+        // eslint-disable-next-line no-alert
+        alert('Item marcado como comprado. Preço/quantidade não foram salvos porque a tabela não tem esses campos.')
+      }
+      setPurchases((prev) => [...prev, data])
+    }
+
     if (error) {
       // eslint-disable-next-line no-alert
       alert(`Erro ao salvar compra: ${error.message}`)
     } else if (data) {
       setPurchases((prev) => [...prev, data])
     }
+
     setPurchaseTarget(null)
   }
 
