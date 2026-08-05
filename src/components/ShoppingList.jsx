@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Check, Trash2, Camera, TrendingUp } from 'lucide-react'
+import { Plus, Check, Trash2, TrendingUp } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { analyzeItem, urgencyLabel } from '../lib/predict'
-import ReceiptScanner from './ReceiptScanner'
+import PurchaseModal from './PurchaseModal'
 import Modal from './Modal'
 
 export default function ShoppingList({ user }) {
@@ -13,9 +13,9 @@ export default function ShoppingList({ user }) {
   const [shoppingSessionStore, setShoppingSessionStore] = useState('')
   const [showSessionModal, setShowSessionModal] = useState(false)
   const [recentStores, setRecentStores] = useState([])
+  const [purchaseTarget, setPurchaseTarget] = useState(null)
   const [modalStoreName, setModalStoreName] = useState('')
   const [loading, setLoading] = useState(true)
-  const [showScanner, setShowScanner] = useState(false)
   const [sortBy, setSortBy] = useState('urgencia') // urgencia | frequencia
 
   async function loadAll() {
@@ -62,6 +62,25 @@ export default function ShoppingList({ user }) {
     return copy
   }, [enriched, sortBy])
 
+  const sessionTotal = useMemo(() => {
+    if (!shoppingSessionId) return 0
+    return purchases
+      .filter((p) => p.session_id === shoppingSessionId)
+      .reduce((sum, p) => {
+        const priceValue = Number(p.price ?? 0)
+        const quantityValue = Number(p.quantity ?? 1)
+        return sum + priceValue * Math.max(1, quantityValue)
+      }, 0)
+  }, [purchases, shoppingSessionId])
+
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+
   async function addItem() {
     if (!newName.trim()) return
     const { data, error } = await supabase
@@ -81,13 +100,36 @@ export default function ShoppingList({ user }) {
   }
 
   async function markPurchased(item) {
+    // abrir modal para preencher preço/unidade antes de inserir
+    setPurchaseTarget(item)
+  }
+
+  async function confirmPurchase({ price = null, unit = null, quantity = 1 }) {
+    if (!purchaseTarget) return
+    const item = purchaseTarget
     const today = new Date().toISOString().slice(0, 10)
+    // evitar duplicatas: mesma item_id e mesma data
+    const exists = purchases.find((p) => p.item_id === item.id && p.purchased_at === today)
+    if (exists) {
+      // já marcado hoje
+      // eslint-disable-next-line no-alert
+      alert('Item já marcado como comprado hoje.')
+      setPurchaseTarget(null)
+      return
+    }
     const payload = { item_id: item.id, purchased_at: today, purchased_by: user }
+    if (price) payload.price = Number(String(price).replace(',', '.'))
+    if (unit) payload.unit = unit
+    if (quantity > 0) payload.quantity = quantity
     if (shoppingSessionId) payload.session_id = shoppingSessionId
     const { data, error } = await supabase.from('shopping_purchases').insert(payload).select('*, shopping_sessions(store_name)').single()
-    if (!error && data) {
+    if (error) {
+      // eslint-disable-next-line no-alert
+      alert(`Erro ao salvar compra: ${error.message}`)
+    } else if (data) {
       setPurchases((prev) => [...prev, data])
     }
+    setPurchaseTarget(null)
   }
 
   async function startSession(storeName) {
@@ -121,19 +163,14 @@ export default function ShoppingList({ user }) {
           <h2 className="font-display font-semibold text-xl text-ink">Lista de compras</h2>
           <p className="text-sm text-ink/60">Previsão automática baseada no histórico de compras.</p>
         </div>
-        <button
-          onClick={() => setShowScanner(true)}
-          className="flex items-center gap-2 bg-teal text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-teal-dark transition-colors self-start"
-        >
-          <Camera size={16} /> Ler comprovante
-        </button>
       </div>
 
       <div className="flex gap-2 items-center">
-        <div className="flex-1 flex gap-2 items-center">
+        <div className="flex-1 flex flex-col gap-2 sm:flex-row sm:items-center">
           {shoppingSessionId ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <span className="text-sm text-ink/70">Comprando em: <strong>{shoppingSessionStore}</strong></span>
+              <span className="text-sm text-ink/70">Total: <strong>{formatCurrency(sessionTotal)}</strong></span>
               <button onClick={endSession} className="rounded-full px-3 py-1 text-xs border border-line text-ink/60">Finalizar</button>
             </div>
           ) : (
@@ -179,7 +216,7 @@ export default function ShoppingList({ user }) {
       {loading ? (
         <p className="text-sm text-ink/50">Carregando...</p>
       ) : sorted.length === 0 ? (
-        <EmptyState text="Nenhum item ainda. Adicione o primeiro item acima ou leia um comprovante." />
+        <EmptyState text="Nenhum item ainda. Adicione o primeiro item acima." />
       ) : (
         <ul className="space-y-2">
           {sorted.map((item) => {
@@ -223,6 +260,7 @@ export default function ShoppingList({ user }) {
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => markPurchased(item)}
+                    disabled={!!purchaseTarget}
                     className="p-2 rounded-full bg-teal/10 text-teal hover:bg-teal hover:text-white transition-colors"
                     aria-label="Marcar como comprado"
                     title="Marcar como comprado hoje"
@@ -243,26 +281,11 @@ export default function ShoppingList({ user }) {
         </ul>
       )}
 
-      {showScanner && (
-        <ReceiptScanner
-          onClose={() => setShowScanner(false)}
-          onConfirm={async (names) => {
-            const today = new Date().toISOString().slice(0, 10)
-            for (const name of names) {
-              let item = items.find((i) => i.name.toLowerCase() === name.toLowerCase())
-              if (!item) {
-                const { data } = await supabase.from('shopping_items').insert({ name }).select().single()
-                item = data
-              }
-              if (item) {
-                const payload = { item_id: item.id, purchased_at: today, purchased_by: user }
-                if (shoppingSessionId) payload.session_id = shoppingSessionId
-                await supabase.from('shopping_purchases').insert(payload)
-              }
-            }
-            await loadAll()
-            setShowScanner(false)
-          }}
+      {purchaseTarget && (
+        <PurchaseModal
+          item={purchaseTarget}
+          onCancel={() => setPurchaseTarget(null)}
+          onConfirm={confirmPurchase}
         />
       )}
 
