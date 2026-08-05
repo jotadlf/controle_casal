@@ -15,17 +15,14 @@ export default function Calendar() {
       // buscar contas ativas e tarefas que têm due_date
       const [
         { data: billsData },
-        { data: tasksWithDue, error: tasksError },
+        { data: allTasks },
       ] = await Promise.all([
         supabase.from('bills').select('*').eq('active', true),
-        supabase.from('repair_requests').select('*').neq('due_date', null),
+        supabase.from('repair_requests').select('*'),
       ])
-      if (tasksError) {
-        // eslint-disable-next-line no-console
-        console.warn('Calendar: failed to load tasks with due date', tasksError)
-      }
+      const tasksWithDue = (allTasks || []).filter((task) => task?.due_date)
       setBills(billsData || [])
-      setTasks(tasksWithDue || [])
+      setTasks(tasksWithDue)
       setLoading(false)
     }
     loadAll()

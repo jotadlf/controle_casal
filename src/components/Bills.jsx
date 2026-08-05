@@ -14,7 +14,10 @@ export default function Bills({ user }) {
   const [showForm, setShowForm] = useState(false)
 
   const totalSpentThisMonth = useMemo(() => {
-    return payments.reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0)
+    return payments.reduce((sum, payment) => {
+      if (!payment.paid) return sum
+      return sum + Number(payment.amount ?? 0)
+    }, 0)
   }, [payments])
 
   const formatCurrency = (value) =>
