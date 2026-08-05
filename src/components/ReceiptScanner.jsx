@@ -1,29 +1,133 @@
 import { useState } from 'react'
 import { X, Upload, Loader2 } from 'lucide-react'
 
+// Pré-processamento de imagem (canvas): grayscale, contraste, binarização e upscale.
+async function preprocessImage(file) {
+  const bitmap = await createImageBitmap(file)
+  const targetMinWidth = 1200
+  let scale = 1
+  if (bitmap.width < targetMinWidth) scale = Math.min(3, targetMinWidth / bitmap.width)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale)
+  canvas.height = Math.round(bitmap.height * scale)
+  const ctx = canvas.getContext('2d')
+  ctx.imageSmoothingEnabled = true
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+
+  // converter para grayscale
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const d = imgData.data
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2]
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b
+    d[i] = d[i + 1] = d[i + 2] = gray
+  }
+
+  // aumentar contraste leve
+  const contrast = 30
+  const factor = (259 * (contrast + 255)) / (255 * (259 - contrast))
+  for (let i = 0; i < d.length; i += 4) {
+    let v = d[i]
+    v = factor * (v - 128) + 128
+    v = Math.max(0, Math.min(255, v))
+    d[i] = d[i + 1] = d[i + 2] = v
+  }
+  ctx.putImageData(imgData, 0, 0)
+
+  // binarização simples usando limiar baseado na média
+  const imgData2 = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const d2 = imgData2.data
+  let sum = 0
+  for (let i = 0; i < d2.length; i += 4) sum += d2[i]
+  const mean = sum / (d2.length / 4)
+  const thresh = Math.max(120, mean * 0.85)
+  for (let i = 0; i < d2.length; i += 4) {
+    const v = d2[i] < thresh ? 0 : 255
+    d2[i] = d2[i + 1] = d2[i + 2] = v
+  }
+  ctx.putImageData(imgData2, 0, 0)
+
+  return await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+}
+
 // Leitura 100% no navegador (Tesseract.js), sem custo de API.
-// Heurística: pega linhas de texto que parecem nome de produto (letras, sem ser
-// totalmente numéricas) e filtra ruído comum de cupom fiscal (CNPJ, totais, etc).
-function extractItemNames(rawText) {
-  const lines = rawText
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
+// Heurística: usa confidência por palavra, junta linhas de continuação e aplica
+// correções leves de OCR para erros comuns em cupons.
+function extractItemNames(ocrData) {
+  const words = ocrData?.words || []
 
-  const noise = /(cnpj|cpf|total|troco|dinheiro|cartao|cart[aã]o|desconto|subtotal|valor pago|forma de pagamento|nfc-e|chave de acesso|protocolo|consumidor|tributos|qtd\.?$|un\.?$)/i
-
-  const candidates = lines.filter((line) => {
-    if (line.length < 3 || line.length > 45) return false
-    if (noise.test(line)) return false
-    const letters = (line.match(/[a-zA-ZÀ-ÿ]/g) || []).length
-    if (letters < 3) return false
-    // descarta linhas majoritariamente numéricas (preços, códigos de barra)
-    const digits = (line.match(/[0-9]/g) || []).length
-    if (digits > letters) return false
-    return true
+  // Agrupa palavras por linha (propriedade line_num do Tesseract)
+  const linesMap = {}
+  words.forEach((w) => {
+    const ln = w.line_num ?? 0
+    if (!linesMap[ln]) linesMap[ln] = []
+    linesMap[ln].push(w)
   })
 
-  // remove duplicadas mantendo ordem, limita a 25 pra não poluir
+  const lineNums = Object.keys(linesMap).map(Number).sort((a, b) => a - b)
+  const minWordConf = 45
+  const noise = /(cnpj|cpf|total|troco|dinheiro|cartao|cart[aã]o|desconto|subtotal|valor pago|forma de pagamento|nfc-e|chave de acesso|protocolo|consumidor|tributos|qtd\.?$|un\.?$)/i
+  const pricePattern = /[0-9]+[.,][0-9]{2}$/
+
+  const letterCorrections = (token) => {
+    if (!/[A-Za-zÀ-ÿ]/.test(token)) return token
+    return token
+      .replace(/0/g, 'O')
+      .replace(/1/g, 'I')
+      .replace(/5/g, 'S')
+      .replace(/8/g, 'B')
+  }
+
+  const rawLines = lineNums.map((ln) => {
+    const ws = linesMap[ln] || []
+    const filtered = ws.filter((w) => w.confidence >= minWordConf)
+    const text = filtered.map((w) => w.text).join(' ').trim()
+    const avgConf = filtered.length ? Math.round(filtered.reduce((s, w) => s + w.confidence, 0) / filtered.length) : 0
+    return { text, avgConf }
+  })
+
+  // Juntar linhas de continuação curtas (heurística)
+  const merged = []
+  for (let i = 0; i < rawLines.length; i++) {
+    let cur = rawLines[i].text
+    if (!cur) continue
+    if (
+      cur.length < 12 &&
+      i + 1 < rawLines.length &&
+      rawLines[i + 1].text.length > 0 &&
+      rawLines[i + 1].text.length < 30 &&
+      !pricePattern.test(cur) &&
+      !pricePattern.test(rawLines[i + 1].text)
+    ) {
+      cur = (cur + ' ' + rawLines[i + 1].text).trim()
+      i++
+    }
+    merged.push(cur)
+  }
+
+  const candidates = merged
+    .map((line) => line.replace(/\s{2,}/g, ' ').trim())
+    .filter((line) => {
+      if (!line) return false
+      if (line.length < 3 || line.length > 60) return false
+      if (noise.test(line)) return false
+      const letters = (line.match(/[a-zA-ZÀ-ÿ]/g) || []).length
+      if (letters < 2) return false
+      const digits = (line.match(/[0-9]/g) || []).length
+      if (digits > letters) return false
+      return true
+    })
+    .map((line) =>
+      line
+        .split(' ')
+        .map((t) => {
+          if (pricePattern.test(t) || /^[0-9-/.]{2,}$/.test(t)) return t
+          return letterCorrections(t)
+        })
+        .join(' ')
+    )
+
   const seen = new Set()
   const unique = []
   for (const c of candidates) {
@@ -49,13 +153,26 @@ export default function ReceiptScanner({ onClose, onConfirm }) {
     setStatus('processing')
     setError('')
     try {
+      // pré-processa imagem no canvas antes de enviar ao Tesseract
+      setProgress(5)
+      const processed = await preprocessImage(file)
+      setProgress(10)
+
       const Tesseract = await import('tesseract.js')
-      const { data } = await Tesseract.recognize(file, 'por', {
+      const whitelist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,-/()ºª%'
+      const { data } = await Tesseract.recognize(processed, 'por', {
         logger: (m) => {
-          if (m.status === 'recognizing text') setProgress(Math.round(m.progress * 100))
+          if (m.status === 'recognizing text' || m.status === 'recognizing') setProgress(Math.round(m.progress * 100))
         },
+        tessedit_pageseg_mode: 6,
+        tessedit_char_whitelist: whitelist,
+        oem: 1,
       })
-      const names = extractItemNames(data.text)
+      // log temporário para depuração: inspecione `data.words` no console do navegador
+      // Remova em produção
+      // eslint-disable-next-line no-console
+      console.log('Tesseract data.words:', data.words)
+      const names = extractItemNames(data)
       setCandidates(names)
       setSelected(new Set(names))
       setStatus('review')

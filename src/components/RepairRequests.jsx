@@ -16,14 +16,23 @@ const PRIORITY = [
   { key: 'alta', label: 'Alta' },
 ]
 
-export default function RepairRequests({ user }) {
+const CATEGORIES = ['Reparo', 'Casa', 'Documento', 'Pessoal', 'Outro']
+
+export default function Tasks({ user }) {
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [openId, setOpenId] = useState(null)
   const [comments, setComments] = useState({})
   const [commentDraft, setCommentDraft] = useState('')
-  const [form, setForm] = useState({ title: '', description: '', priority: 'media', assigned_to: '' })
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    priority: 'media',
+    assigned_to: '',
+    category: 'Outro',
+    due_date: '',
+  })
   const [filter, setFilter] = useState('todos')
 
   async function loadAll() {
@@ -66,12 +75,14 @@ export default function RepairRequests({ user }) {
         status: 'pendente',
         requested_by: user,
         assigned_to: form.assigned_to || null,
+        category: form.category || 'Outro',
+        due_date: form.due_date || null,
       })
       .select()
       .single()
     if (!error && data) {
       setRequests((prev) => [data, ...prev])
-      setForm({ title: '', description: '', priority: 'media', assigned_to: '' })
+      setForm({ title: '', description: '', priority: 'media', assigned_to: '', category: 'Outro', due_date: '' })
       setShowForm(false)
     }
   }
@@ -108,16 +119,16 @@ export default function RepairRequests({ user }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-display font-semibold text-xl text-ink">Solicitações de reparo</h2>
-          <p className="text-sm text-ink/60">O que precisa ser arrumado, e quem tá cuidando.</p>
+            <h2 className="font-display font-semibold text-xl text-ink">Tarefas</h2>
+            <p className="text-sm text-ink/60">Tarefas gerais (reparos, pendências de casa, documentos, pessoais).</p>
+          </div>
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="flex items-center gap-2 bg-ink text-white px-4 py-2 rounded-full text-sm font-medium"
+          >
+            <Plus size={16} /> Nova tarefa
+          </button>
         </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-2 bg-ink text-white px-4 py-2 rounded-full text-sm font-medium"
-        >
-          <Plus size={16} /> Novo pedido
-        </button>
-      </div>
 
       {showForm && (
         <div className="bg-white border border-line rounded-card p-4 space-y-3">
@@ -146,6 +157,17 @@ export default function RepairRequests({ user }) {
                 {p.label}
               </button>
             ))}
+            {CATEGORIES.map((c) => (
+              <button
+                key={c}
+                onClick={() => setForm({ ...form, category: c })}
+                className={`px-3 py-1.5 rounded-full text-xs border ${
+                  form.category === c ? 'bg-ink text-white border-ink' : 'border-line text-ink/60'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
             <select
               value={form.assigned_to}
               onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}
@@ -159,9 +181,17 @@ export default function RepairRequests({ user }) {
               ))}
             </select>
           </div>
-          <button onClick={addRequest} className="w-full bg-teal text-white rounded-full py-2 text-sm font-medium">
-            Criar pedido
-          </button>
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={form.due_date}
+              onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+              className="rounded-full border border-line px-3 py-2 text-sm"
+            />
+            <button onClick={addRequest} className="flex-1 bg-teal text-white rounded-full py-2 text-sm font-medium">
+              Criar tarefa
+            </button>
+          </div>
         </div>
       )}
 
