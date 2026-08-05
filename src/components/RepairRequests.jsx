@@ -132,7 +132,6 @@ export default function Tasks({ user }) {
       {showForm && (
         <div className="bg-white border border-line rounded-card p-4 space-y-3">
           <input
-            placeholder="Ex: Vazamento na pia da cozinha"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             className="w-full rounded-full border border-line px-4 py-2 text-sm"

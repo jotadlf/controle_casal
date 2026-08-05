@@ -11,12 +11,17 @@ export default function Calendar() {
   useEffect(() => {
     async function loadAll() {
       setLoading(true)
-      const [{ data: billsData }, { data: tasksData }] = await Promise.all([
+      // buscar contas ativas e tarefas que têm due_date
+      const [
+        { data: billsData },
+        { data: tasksWithDue },
+      ] = await Promise.all([
         supabase.from('bills').select('*').eq('active', true),
-        supabase.from('repair_requests').select('*').is('due_date', null).not('id', 'is', null) // placeholder to fetch; we'll refetch proper below
+        supabase.from('repair_requests').select('*').not('due_date', null),
       ])
-      // above line intentionally simple; fetch tasks with due_date separately:
-      const { data: tasksWithDue } = await supabase.from('repair_requests').select('*').not('due_date', null)
+      // depuração: mostrar tarefas retornadas
+      // eslint-disable-next-line no-console
+      console.log('Calendar: tasksWithDue', tasksWithDue)
       setBills(billsData || [])
       setTasks(tasksWithDue || [])
       setLoading(false)

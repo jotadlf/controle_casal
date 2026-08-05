@@ -8,18 +8,27 @@ export default function ShoppingList({ user }) {
   const [items, setItems] = useState([])
   const [purchases, setPurchases] = useState([])
   const [newName, setNewName] = useState('')
+  const [shoppingSessionId, setShoppingSessionId] = useState(null)
+  const [shoppingSessionStore, setShoppingSessionStore] = useState('')
+  const [showSessionModal, setShowSessionModal] = useState(false)
+  const [recentStores, setRecentStores] = useState([])
   const [loading, setLoading] = useState(true)
   const [showScanner, setShowScanner] = useState(false)
   const [sortBy, setSortBy] = useState('urgencia') // urgencia | frequencia
 
   async function loadAll() {
     setLoading(true)
-    const [{ data: itemsData }, { data: purchasesData }] = await Promise.all([
+    // buscar items, purchases (incluindo sessão) e sugestões de lojas
+    const [{ data: itemsData }, { data: purchasesData }, { data: sessions }] = await Promise.all([
       supabase.from('shopping_items').select('*').order('name'),
-      supabase.from('shopping_purchases').select('*'),
+      // tenta trazer dados aninhados de shopping_sessions via relacionamento (se existir)
+      supabase.from('shopping_purchases').select('*, shopping_sessions(store_name)'),
+      supabase.from('shopping_sessions').select('store_name').order('started_at', { ascending: false }).limit(50),
     ])
     setItems(itemsData || [])
     setPurchases(purchasesData || [])
+    const distinct = Array.from(new Set((sessions || []).map((s) => s.store_name))).slice(0, 5)
+    setRecentStores(distinct)
     setLoading(false)
   }
 
@@ -71,14 +80,36 @@ export default function ShoppingList({ user }) {
 
   async function markPurchased(item) {
     const today = new Date().toISOString().slice(0, 10)
-    const { data, error } = await supabase
-      .from('shopping_purchases')
-      .insert({ item_id: item.id, purchased_at: today, purchased_by: user })
-      .select()
-      .single()
+    const payload = { item_id: item.id, purchased_at: today, purchased_by: user }
+    if (shoppingSessionId) payload.session_id = shoppingSessionId
+    const { data, error } = await supabase.from('shopping_purchases').insert(payload).select('*, shopping_sessions(store_name)').single()
     if (!error && data) {
       setPurchases((prev) => [...prev, data])
     }
+  }
+
+  async function startSession(storeName) {
+    const { data, error } = await supabase
+      .from('shopping_sessions')
+      .insert({ store_name: storeName, started_by: user })
+      .select()
+      .single()
+    if (!error && data) {
+      setShoppingSessionId(data.id)
+      setShoppingSessionStore(data.store_name)
+      setShowSessionModal(false)
+      // refresh recent stores
+      const { data: sessions } = await supabase.from('shopping_sessions').select('store_name').order('started_at', { ascending: false }).limit(50)
+      const distinct = Array.from(new Set((sessions || []).map((s) => s.store_name))).slice(0, 5)
+      setRecentStores(distinct)
+    }
+  }
+
+  async function endSession() {
+    if (!shoppingSessionId) return
+    await supabase.from('shopping_sessions').update({ ended_at: new Date().toISOString() }).eq('id', shoppingSessionId)
+    setShoppingSessionId(null)
+    setShoppingSessionStore('')
   }
 
   return (
@@ -97,13 +128,32 @@ export default function ShoppingList({ user }) {
       </div>
 
       <div className="flex gap-2 items-center">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addItem()}
-          placeholder="Adicionar item (ex: arroz, sabão em pó...)"
-          className="flex-1 rounded-full border border-line px-4 py-2 text-sm bg-white focus:border-teal outline-none"
-        />
+        <div className="flex-1 flex gap-2 items-center">
+          {shoppingSessionId ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-ink/70">Comprando em: <strong>{shoppingSessionStore}</strong></span>
+              <button onClick={endSession} className="rounded-full px-3 py-1 text-xs border border-line text-ink/60">Finalizar</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                const suggestion = recentStores[0] || ''
+                const name = prompt('Nome do mercado:', suggestion)
+                if (name && name.trim()) startSession(name.trim())
+              }}
+              className="rounded-full px-3 py-1 text-xs bg-teal text-white"
+            >
+              Iniciar Compras
+            </button>
+          )}
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addItem()}
+            placeholder="Adicionar item"
+            className="flex-1 rounded-full border border-line px-4 py-2 text-sm bg-white focus:border-teal outline-none"
+          />
+        </div>
         <button
           onClick={addItem}
           className="bg-ink text-white rounded-full p-2.5 hover:bg-ink/80 transition-colors"
@@ -154,9 +204,21 @@ export default function ShoppingList({ user }) {
                       {u.label}
                     </span>
                     {item.analysis.timesBought > 0 && (
-                      <span className="text-xs text-ink/40 flex items-center gap-1 font-mono">
-                        <TrendingUp size={12} /> {item.analysis.timesBought}x comprado
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-ink/40 flex items-center gap-1 font-mono">
+                          <TrendingUp size={12} /> {item.analysis.timesBought}x comprado
+                        </span>
+                        {(() => {
+                          const itemPurchs = purchases
+                            .filter((p) => p.item_id === item.id)
+                            .sort((a, b) => new Date(a.purchased_at) - new Date(b.purchased_at))
+                          const last = itemPurchs[itemPurchs.length - 1]
+                          if (last?.shopping_sessions?.store_name) {
+                            return <span className="text-xs text-ink/50">· {last.shopping_sessions.store_name}</span>
+                          }
+                          return null
+                        })()}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -195,9 +257,9 @@ export default function ShoppingList({ user }) {
                 item = data
               }
               if (item) {
-                await supabase
-                  .from('shopping_purchases')
-                  .insert({ item_id: item.id, purchased_at: today, purchased_by: user })
+                const payload = { item_id: item.id, purchased_at: today, purchased_by: user }
+                if (shoppingSessionId) payload.session_id = shoppingSessionId
+                await supabase.from('shopping_purchases').insert(payload)
               }
             }
             await loadAll()
