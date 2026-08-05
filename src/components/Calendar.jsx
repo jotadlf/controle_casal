@@ -15,14 +15,15 @@ export default function Calendar() {
       // buscar contas ativas e tarefas que têm due_date
       const [
         { data: billsData },
-        { data: tasksWithDue },
+        { data: tasksWithDue, error: tasksError },
       ] = await Promise.all([
         supabase.from('bills').select('*').eq('active', true),
-        supabase.from('repair_requests').select('*').not('due_date', null),
+        supabase.from('repair_requests').select('*').neq('due_date', null),
       ])
-      // depuração: mostrar tarefas retornadas
-      // eslint-disable-next-line no-console
-      console.log('Calendar: tasksWithDue', tasksWithDue)
+      if (tasksError) {
+        // eslint-disable-next-line no-console
+        console.warn('Calendar: failed to load tasks with due date', tasksError)
+      }
       setBills(billsData || [])
       setTasks(tasksWithDue || [])
       setLoading(false)

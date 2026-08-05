@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import Modal from './Modal'
 
-export default function PurchaseModal({ item, defaultPrice = '', defaultUnit = '', defaultQuantity = 1, onCancel, onConfirm }) {
+export default function PurchaseModal({ item, defaultPrice = '', defaultUnit = 'UN', defaultQuantity = 1, onCancel, onConfirm }) {
   const [price, setPrice] = useState(defaultPrice)
-  const [unit, setUnit] = useState(defaultUnit)
+  const [unit, setUnit] = useState(defaultUnit || 'UN')
   const [quantity, setQuantity] = useState(defaultQuantity)
 
   return (
@@ -38,7 +38,18 @@ export default function PurchaseModal({ item, defaultPrice = '', defaultUnit = '
             </button>
           </div>
         </div>
-        <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Unidade (ex: UN, KG)" className="w-full rounded-full border border-line px-4 py-2 text-sm" />
+        <label className="block text-sm text-ink/70">Unidade</label>
+        <select
+          value={unit}
+          onChange={(e) => setUnit(e.target.value)}
+          className="w-full rounded-full border border-line px-4 py-2 text-sm bg-white"
+        >
+          <option value="UN">UN</option>
+          <option value="KG">KG</option>
+          <option value="LT">LT</option>
+          <option value="PC">PC</option>
+          <option value="BX">BX</option>
+        </select>
       </div>
     </Modal>
   )

@@ -13,6 +13,18 @@ export default function Bills({ user }) {
   const [form, setForm] = useState({ name: '', category: 'Outro', amount: '', due_day: '' })
   const [showForm, setShowForm] = useState(false)
 
+  const totalSpentThisMonth = useMemo(() => {
+    return payments.reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0)
+  }, [payments])
+
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)
+
   async function loadAll() {
     setLoading(true)
     const refMonth = currentReferenceMonth()
@@ -106,6 +118,7 @@ export default function Bills({ user }) {
         <div>
           <h2 className="font-display font-semibold text-xl text-ink">Contas recorrentes</h2>
           <p className="text-sm text-ink/60">Vencimentos do mês atual.</p>
+          <p className="text-sm text-teal font-semibold">Gasto total do mês: {formatCurrency(totalSpentThisMonth)}</p>
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}

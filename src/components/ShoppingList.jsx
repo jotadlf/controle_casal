@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus, Check, Trash2, TrendingUp } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { analyzeItem, urgencyLabel } from '../lib/predict'
+import { currentReferenceMonth } from '../lib/bills'
 import PurchaseModal from './PurchaseModal'
 import Modal from './Modal'
 
@@ -175,8 +176,45 @@ export default function ShoppingList({ user }) {
     }
   }
 
+  async function createPaidShoppingBill(total) {
+    const today = new Date().toISOString().slice(0, 10)
+    const dueDay = Number(today.slice(8, 10)) || 1
+    const billName = `Compras ${shoppingSessionStore}`
+
+    const { data: billData, error: billError } = await supabase
+      .from('bills')
+      .insert({
+        name: billName,
+        category: 'Compras',
+        amount: total,
+        due_day: dueDay,
+        active: true,
+      })
+      .select()
+      .single()
+
+    if (billError || !billData) {
+      console.error('Falha ao criar conta de compras', billError)
+      return
+    }
+
+    const refMonth = currentReferenceMonth()
+    await supabase.from('bill_payments').insert({
+      bill_id: billData.id,
+      reference_month: refMonth,
+      amount: total,
+      paid: true,
+      paid_at: today,
+      paid_by: user,
+    })
+  }
+
   async function endSession() {
     if (!shoppingSessionId) return
+    const total = sessionTotal
+    if (total > 0) {
+      await createPaidShoppingBill(total)
+    }
     await supabase.from('shopping_sessions').update({ ended_at: new Date().toISOString() }).eq('id', shoppingSessionId)
     setShoppingSessionId(null)
     setShoppingSessionStore('')
@@ -197,12 +235,12 @@ export default function ShoppingList({ user }) {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <span className="text-sm text-ink/70">Comprando em: <strong>{shoppingSessionStore}</strong></span>
               <span className="text-sm text-ink/70">Total: <strong>{formatCurrency(sessionTotal)}</strong></span>
-              <button onClick={endSession} className="rounded-full px-3 py-1 text-xs border border-line text-ink/60">Finalizar</button>
+              <button onClick={endSession} className="rounded-full px-3 py-1 text-xs bg-coral text-white hover:bg-coral-dark transition-colors">Finalizar</button>
             </div>
           ) : (
             <button
               onClick={() => setShowSessionModal(true)}
-              className="rounded-full px-3 py-1 text-xs bg-teal text-white"
+              className="rounded-full px-3 py-1 text-xs bg-teal text-white hover:bg-teal-dark transition-colors"
             >
               Iniciar Compras
             </button>
