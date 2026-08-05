@@ -138,42 +138,14 @@ export default function ShoppingList({ user }) {
     const isMissingColumnError = (message) =>
       /could not find the '(price|unit|quantity)' column of 'shopping_purchases' in the schema cache|column .* does not exist/i.test(message)
 
-    const stripMissingFields = (message, currentPayload) => {
-      const missingFields = []
-      const fieldMatch = message.match(/(?:'(price|unit|quantity)' column of 'shopping_purchases'|column "(price|unit|quantity)" does not exist)/gi)
-      if (fieldMatch) {
-        fieldMatch.forEach((match) => {
-          const key = match.match(/price|unit|quantity/i)
-          if (key) missingFields.push(key[0].toLowerCase())
-        })
-      }
-      const newPayload = { ...basePayload }
-      if (price && !missingFields.includes('price')) newPayload.price = Number(String(price).replace(',', '.'))
-      if (unit && !missingFields.includes('unit')) newPayload.unit = unit
-      if (quantity > 0 && !missingFields.includes('quantity')) newPayload.quantity = quantity
-      return newPayload
-    }
-
-    while (error && isMissingColumnError(error.message)) {
-      const nextPayload = stripMissingFields(error.message, payload)
-      if (Object.keys(nextPayload).length === Object.keys(basePayload).length) {
-        break
-      }
-      payload = nextPayload
-      const retry = await tryInsert(payload)
+    if (error && isMissingColumnError(error.message)) {
+      const retry = await tryInsert({ ...basePayload })
       data = retry.data
       error = retry.error
-    }
-
-    if (error) {
-      // eslint-disable-next-line no-alert
-      alert(`Erro ao salvar compra: ${error.message}`)
-    } else if (data) {
-      if (!payload.price && !payload.unit && payload.quantity === undefined) {
+      if (!error) {
         // eslint-disable-next-line no-alert
         alert('Item marcado como comprado. Preço/quantidade não foram salvos porque a tabela não tem esses campos.')
       }
-      setPurchases((prev) => [...prev, data])
     }
 
     if (error) {
