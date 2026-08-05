@@ -14,11 +14,12 @@ export default function Bills({ user }) {
   const [showForm, setShowForm] = useState(false)
 
   const totalSpentThisMonth = useMemo(() => {
+    const activeBillIds = new Set(bills.map((bill) => bill.id))
     return payments.reduce((sum, payment) => {
-      if (!payment.paid) return sum
+      if (!payment.paid || !activeBillIds.has(payment.bill_id)) return sum
       return sum + Number(payment.amount ?? 0)
     }, 0)
-  }, [payments])
+  }, [payments, bills])
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat('pt-BR', {

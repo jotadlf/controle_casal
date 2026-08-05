@@ -83,6 +83,8 @@ export default function ShoppingList({ user }) {
       maximumFractionDigits: 2,
     }).format(value)
 
+  const today = new Date().toISOString().slice(0, 10)
+
   async function addItem() {
     if (!newName.trim()) return
     const { data, error } = await supabase
@@ -292,13 +294,18 @@ export default function ShoppingList({ user }) {
               teal: 'bg-teal-light text-teal-dark border-teal/20',
               gray: 'bg-ink/5 text-ink/50 border-ink/10',
             }
+            const alreadyBoughtToday = purchases.some(
+              (p) => p.item_id === item.id && p.purchased_at === today,
+            )
             return (
               <li
                 key={item.id}
                 className="flex items-center justify-between gap-3 bg-white rounded-card border border-line px-4 py-3"
               >
                 <div className="min-w-0">
-                  <p className="font-medium text-ink truncate">{item.name}</p>
+                  <p className={`font-medium truncate ${alreadyBoughtToday ? 'text-ink/40 line-through' : 'text-ink'}`}>
+                    {item.name}
+                  </p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${colorMap[u.color]}`}>
                       {u.label}

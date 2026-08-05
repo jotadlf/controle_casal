@@ -15,7 +15,7 @@ const PRIORITY = [
   { key: 'alta', label: 'Alta' },
 ]
 
-const CATEGORY_OPTIONS = ['Casa', 'Trabalho', 'Pessoal']
+const CATEGORY_OPTIONS = ['Casa', 'Trabalho', 'Pessoal', 'Outro']
 
 export default function Tasks({ user }) {
   const [requests, setRequests] = useState([])
@@ -81,7 +81,7 @@ export default function Tasks({ user }) {
       .single()
     if (!error && data) {
       setRequests((prev) => [data, ...prev])
-      setForm({ title: '', description: '', priority: 'media', assigned_to: '', category: 'Outro', due_date: '' })
+      setForm({ title: '', description: '', priority: 'baixa', assigned_to: '', category: 'Casa', due_date: '' })
       setShowForm(false)
     }
   }
