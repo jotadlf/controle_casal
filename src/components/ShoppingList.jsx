@@ -136,8 +136,11 @@ export default function ShoppingList({ user }) {
       .select()
       .single()
 
+    const isOnListMissingColumn = (message = '') =>
+      /could not find.*on_list|column .* does not exist/i.test(message)
+
     if (error) {
-      if (/column .* does not exist/i.test(error.message)) {
+      if (isOnListMissingColumn(error.message)) {
         setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, on_list: true } : i)))
         setAlert({ type: 'warning', message: 'Item reativado localmente; campo on_list não existe no backend.' })
       } else {
