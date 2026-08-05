@@ -30,7 +30,23 @@ export default function App() {
       <header className="border-b border-line bg-white sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="font-display font-bold text-lg text-ink tracking-tight">
-            Casa<span className="text-teal">.</span>
+            Casa
+            <span className="ml-3 inline-flex items-center gap-2" aria-hidden>
+              {/* casal (duas silhuetas minimalistas) */}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-ink">
+                <path d="M8 11a2 2 0 100-4 2 2 0 000 4z" fill="currentColor" />
+                <path d="M8 13c-2.21 0-4 1.79-4 4v1h8v-1c0-2.21-1.79-4-4-4z" fill="currentColor" />
+                <path d="M16 11a2 2 0 100-4 2 2 0 000 4z" fill="currentColor" />
+                <path d="M16 13c-1.66 0-3 1.34-3 3v1h6v-1c0-1.66-1.34-3-3-3z" fill="currentColor" />
+              </svg>
+              {/* gatinho */}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-ink">
+                <path d="M12 2c.6 0 1 .4 1 1v1l.7.3c.5.2 1 .5 1.5.9.4.4.7.9.9 1.5.2.5.3 1 .3 1.6 0 3.3-2.7 6-6 6s-6-2.7-6-6c0-.6.1-1.1.3-1.6.2-.6.5-1.1.9-1.5.5-.4 1-.7 1.5-.9L11 4V3c0-.6.4-1 1-1z" fill="currentColor"/>
+                <path d="M9 14c0 1.7 1.3 3 3 3s3-1.3 3-3v-1H9v1z" fill="currentColor"/>
+                <path d="M10 9.5c.3.3.8.3 1.1 0 .3-.3.3-.8 0-1.1-.3-.3-.8-.3-1.1 0-.3.3-.3.8 0 1.1zM14 9.5c.3.3.8.3 1.1 0 .3-.3.3-.8 0-1.1-.3-.3-.8-.3-1.1 0-.3.3-.3.8 0 1.1z" fill="currentColor"/>
+              </svg>
+            </span>
+            <span className="text-teal">.</span>
           </h1>
           <UserSwitch user={user} setUser={setUser} />
         </div>

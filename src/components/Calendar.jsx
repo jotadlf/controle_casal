@@ -7,6 +7,7 @@ export default function Calendar() {
   const [bills, setBills] = useState([])
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [today] = useState(() => new Date())
 
   useEffect(() => {
     async function loadAll() {
@@ -34,6 +35,9 @@ export default function Calendar() {
     const now = new Date()
     const year = now.getFullYear()
     const month = now.getMonth()
+    const monthNames = [
+      'Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
+    ]
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
     const daysInMonth = lastDay.getDate()
@@ -51,18 +55,23 @@ export default function Calendar() {
       }
     })
 
-    // tarefas com due_date (assume ISO yyyy-mm-dd)
+    // tarefas com due_date (tentar parse robusto)
     tasks.forEach((t) => {
       if (!t.due_date) return
-      const d = new Date(t.due_date)
+      let d = new Date(t.due_date)
+      if (isNaN(d.getTime())) {
+        // tentar truncar para yyyy-mm-dd
+        const s = String(t.due_date).slice(0, 10)
+        d = new Date(s)
+      }
+      if (isNaN(d.getTime())) return
       if (d.getFullYear() === year && d.getMonth() === month) {
         const day = d.getDate()
         map[day] = map[day] || { bills: [], tasks: [] }
         map[day].tasks.push({ id: t.id, title: t.title, due: d })
       }
     })
-
-    return { map, daysInMonth, firstDayWeekday: firstDay.getDay() }
+    return { map, daysInMonth, firstDayWeekday: firstDay.getDay(), monthName: monthNames[month], year }
   }, [bills, tasks])
 
   function colorForItem(d) {
@@ -84,6 +93,10 @@ export default function Calendar() {
       </div>
 
       <div className="bg-white border border-line rounded-card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-lg font-medium text-ink">{monthData.monthName} {monthData.year}</div>
+          <div className="text-sm text-ink/60">Hoje: {today.toISOString().slice(0,10)}</div>
+        </div>
         <div className="grid grid-cols-7 gap-2 text-center text-xs text-ink/60 mb-2">
           {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map((d) => <div key={d}>{d}</div>)}
         </div>
@@ -97,11 +110,12 @@ export default function Calendar() {
             const cell = monthData.map[day] || { bills: [], tasks: [] }
             const hasBills = cell.bills.length > 0
             const hasTasks = cell.tasks.length > 0
+            const isToday = today.getFullYear() === monthData.year && today.getMonth() === new Date().getMonth() && today.getDate() === day
             return (
               <button
                 key={day}
                 onClick={() => setSelectedDay(day)}
-                className="p-2 border border-line rounded-card text-left min-h-[60px] bg-white"
+                className={`p-2 border rounded-card text-left min-h-[60px] ${isToday ? 'border-teal bg-teal-light' : 'border-line bg-white'}`}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-ink">{day}</span>

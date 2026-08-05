@@ -3,6 +3,7 @@ import { Plus, Check, Trash2, Camera, TrendingUp } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { analyzeItem, urgencyLabel } from '../lib/predict'
 import ReceiptScanner from './ReceiptScanner'
+import Modal from './Modal'
 
 export default function ShoppingList({ user }) {
   const [items, setItems] = useState([])
@@ -12,6 +13,7 @@ export default function ShoppingList({ user }) {
   const [shoppingSessionStore, setShoppingSessionStore] = useState('')
   const [showSessionModal, setShowSessionModal] = useState(false)
   const [recentStores, setRecentStores] = useState([])
+  const [modalStoreName, setModalStoreName] = useState('')
   const [loading, setLoading] = useState(true)
   const [showScanner, setShowScanner] = useState(false)
   const [sortBy, setSortBy] = useState('urgencia') // urgencia | frequencia
@@ -136,11 +138,7 @@ export default function ShoppingList({ user }) {
             </div>
           ) : (
             <button
-              onClick={() => {
-                const suggestion = recentStores[0] || ''
-                const name = prompt('Nome do mercado:', suggestion)
-                if (name && name.trim()) startSession(name.trim())
-              }}
+              onClick={() => setShowSessionModal(true)}
               className="rounded-full px-3 py-1 text-xs bg-teal text-white"
             >
               Iniciar Compras
@@ -266,6 +264,45 @@ export default function ShoppingList({ user }) {
             setShowScanner(false)
           }}
         />
+      )}
+
+      {showSessionModal && (
+        <Modal
+          title="Iniciar sessão de compras"
+          onClose={() => setShowSessionModal(false)}
+          footer={
+            <div className="flex gap-2">
+              <button onClick={() => setShowSessionModal(false)} className="flex-1 py-2 rounded-full border border-line text-sm">Cancelar</button>
+              <button
+                onClick={() => {
+                  const name = modalStoreName.trim() || (recentStores[0] || '')
+                  if (name) startSession(name)
+                }}
+                className="flex-1 py-2 rounded-full bg-teal text-white text-sm"
+              >
+                Iniciar
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            <input
+              value={modalStoreName}
+              onChange={(e) => setModalStoreName(e.target.value)}
+              placeholder={recentStores[0] ? `Sugestão: ${recentStores[0]}` : 'Nome do mercado'}
+              className="w-full rounded-full border border-line px-4 py-2 text-sm"
+            />
+            {recentStores.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {recentStores.map((s) => (
+                  <button key={s} onClick={() => setModalStoreName(s)} className="px-3 py-1 rounded-full border border-line text-xs">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   )
