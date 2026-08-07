@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, MessageCircle, Send, X } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { EmptyState } from './ShoppingList'
 import { USERS } from './UserSwitch'
@@ -22,8 +22,6 @@ export default function Tasks({ user }) {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [openId, setOpenId] = useState(null)
-  const [comments, setComments] = useState({})
-  const [commentDraft, setCommentDraft] = useState('')
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -92,21 +90,12 @@ export default function Tasks({ user }) {
     loadAll()
   }, [])
 
-  async function loadComments(id) {
-    const { data } = await supabase
-      .from('repair_comments')
-      .select('*')
-      .eq('request_id', id)
-      .order('created_at')
-    setComments((prev) => ({ ...prev, [id]: data || [] }))
-  }
 
   function toggleOpen(id) {
     if (openId === id) {
       setOpenId(null)
     } else {
       setOpenId(id)
-      if (!comments[id]) loadComments(id)
     }
   }
 
@@ -184,16 +173,7 @@ export default function Tasks({ user }) {
     setRequests((prev) => prev.filter((r) => r.id !== id))
   }
 
-  async function sendComment(id) {
-    if (!commentDraft.trim()) return
-    const { data } = await supabase
-      .from('repair_comments')
-      .insert({ request_id: id, author: user, comment: commentDraft.trim() })
-      .select()
-      .single()
-    setComments((prev) => ({ ...prev, [id]: [...(prev[id] || []), data] }))
-    setCommentDraft('')
-  }
+  
 
   // by default 'todos' shows only non-concluded tasks; concluded tasks live in a separate panel
   const filtered = requests.filter((r) =>
@@ -214,9 +194,7 @@ export default function Tasks({ user }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display font-semibold text-xl text-ink">Tarefas</h2>
-        </div>
+        <div />
         <button
           onClick={() => setShowForm((v) => !v)}
           aria-label="Nova tarefa"
@@ -244,7 +222,6 @@ export default function Tasks({ user }) {
           </button>
         </div>
       )}
-        }
 
       <div>
         <button
@@ -257,7 +234,7 @@ export default function Tasks({ user }) {
         {showCompletedPanel && (
           <ul className="mt-2 space-y-2">
             {[...completedRequests].sort(sortByPriorityThenId).map((req) => (
-              <li key={`c-${req.id}`} className="bg-white rounded-card border border-line overflow-hidden">
+              <li key={`c-${req.id}`} className={`rounded-card overflow-hidden ${req.priority === 'alta' ? 'bg-coral-light border-coral/30' : req.priority === 'baixa' ? 'bg-blue-50 border-blue-100' : 'bg-white border-line'}`}>
                 <div className="flex items-center justify-between gap-3 px-4 py-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -371,8 +348,9 @@ export default function Tasks({ user }) {
             const priorityBadge = req.priority === 'alta'
               ? 'bg-coral-light text-coral border-coral/30'
               : 'bg-base text-ink/60 border-line'
+            const cardBg = req.priority === 'alta' ? 'bg-coral-light border-coral/30' : req.priority === 'baixa' ? 'bg-blue-50 border-blue-100' : 'bg-white border-line'
             return (
-              <li key={req.id} className="bg-white rounded-card border border-line overflow-hidden">
+              <li key={req.id} className={`rounded-card overflow-hidden ${cardBg}`}>
                 <div className={`flex items-start justify-between gap-3 px-4 ${isOpen ? 'py-3' : 'py-2'}`}>
                   <div className="min-w-0 flex-1 cursor-pointer" onClick={() => toggleOpen(req.id)}>
                     <div className="flex items-center gap-2">
@@ -415,42 +393,7 @@ export default function Tasks({ user }) {
                       {s.label}
                     </button>
                   ))}
-                  <button
-                    onClick={() => toggleOpen(req.id)}
-                    className="ml-auto text-xs px-2.5 py-1 rounded-full border border-line text-ink/50 flex items-center gap-1"
-                  >
-                    <MessageCircle size={12} /> {isOpen ? 'Fechar' : 'Comentários'}
-                  </button>
                 </div>
-
-                {isOpen && (
-                  <div className="border-t border-line bg-base px-4 py-3 space-y-2">
-                    {(comments[req.id] || []).length === 0 && (
-                      <p className="text-xs text-ink/40">Sem comentários ainda.</p>
-                    )}
-                    {(comments[req.id] || []).map((c) => (
-                      <div key={c.id} className="text-sm">
-                        <span className="font-medium text-ink">{c.author}: </span>
-                        <span className="text-ink/70">{c.comment}</span>
-                      </div>
-                    ))}
-                    <div className="flex gap-2 pt-1">
-                      <input
-                        value={commentDraft}
-                        onChange={(e) => setCommentDraft(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && sendComment(req.id)}
-                        placeholder="Escrever um comentário..."
-                        className="flex-1 rounded-full border border-line px-3 py-1.5 text-sm bg-white"
-                      />
-                      <button
-                        onClick={() => sendComment(req.id)}
-                        className="p-2 rounded-full bg-teal text-white"
-                      >
-                        <Send size={14} />
-                      </button>
-                    </div>
-                  </div>
-                )}
               </li>
             )
           })}

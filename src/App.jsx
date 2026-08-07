@@ -7,14 +7,14 @@ import CarMaintenance from './components/CarMaintenance'
 import RepairRequests from './components/RepairRequests'
 
 const TABS = [
+  { key: 'tarefas', label: 'Tarefas', icon: ListChecks, Component: RepairRequests },
   { key: 'compras', label: 'Compras', icon: ShoppingCart, Component: ShoppingList },
   { key: 'contas', label: 'Contas', icon: Receipt, Component: Bills },
   { key: 'carro', label: 'Carro', icon: Car, Component: CarMaintenance },
-  { key: 'tarefas', label: 'Tarefas', icon: ListChecks, Component: RepairRequests },
 ]
 
 export default function App() {
-  const [tab, setTab] = useState('compras')
+  const [tab, setTab] = useState('tarefas')
   const [user, setUser] = useCurrentUser()
 
   if (!user) {
@@ -34,11 +34,11 @@ export default function App() {
               <Heart size={16} className="text-coral" />
               <Cat size={16} />
             </span>
-            <span className="text-teal">.</span>
+            
           </h1>
           <UserSwitch user={user} setUser={setUser} />
         </div>
-        <nav className="max-w-3xl mx-auto px-4 hidden sm:flex gap-1 -mb-px">
+        <nav className="max-w-3xl mx-auto px-4 hidden sm:flex gap-1 -mb-px justify-center">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -78,10 +78,8 @@ export default function App() {
 function NamePicker({ onPick }) {
   return (
     <div className="min-h-screen bg-base flex items-center justify-center px-4">
-      <div className="bg-white border border-line rounded-card p-8 max-w-sm w-full text-center space-y-4">
-        <h1 className="font-display font-bold text-2xl text-ink">
-          Casa<span className="text-teal">.</span>
-        </h1>
+        <div className="bg-white border border-line rounded-card p-8 max-w-sm w-full text-center space-y-4">
+        <h1 className="font-display font-bold text-2xl text-ink">Casa</h1>
         <p className="text-sm text-ink/60">Quem é você?</p>
         <div className="flex flex-col gap-2">
           {['Jairon', 'Bruna'].map((name) => (
