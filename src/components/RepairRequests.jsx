@@ -242,7 +242,7 @@ export default function Tasks({ user }) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm text-ink truncate">{req.title}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${req.priority === 'alta' ? 'bg-coral-light text-coral border-coral/30' : 'bg-base text-ink/60 border-line'}`}>{req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${req.priority === 'alta' ? 'bg-coral-light text-coral border-coral/30' : 'bg-green-50 text-green-800 border-green-100'}`}>{req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${'bg-teal-light text-teal-dark border-teal/20'} ml-2`}>{'Concluído'}</span>
                     </div>
                     {req.description && <p className="text-xs text-ink/50 mt-0.5 line-clamp-1">{req.description}</p>}
@@ -355,7 +355,7 @@ export default function Tasks({ user }) {
             const isOpen = openId === req.id
             const priorityBadge = req.priority === 'alta'
               ? 'bg-coral-light text-coral border-coral/30'
-              : 'bg-base text-ink/60 border-line'
+              : 'bg-green-50 text-green-800 border-green-100'
             const cardBg = 'bg-white border-line'
             return (
               <li key={req.id} className={`rounded-card overflow-hidden ${cardBg}`}>
