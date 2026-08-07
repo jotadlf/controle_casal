@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ShoppingCart, Receipt, Car, ListChecks, Users, Heart, Cat } from 'lucide-react'
 import UserSwitch, { useCurrentUser } from './components/UserSwitch'
 import ShoppingList from './components/ShoppingList'
@@ -16,6 +16,18 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState('tarefas')
   const [user, setUser] = useCurrentUser()
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [showInstall, setShowInstall] = useState(false)
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+      setShowInstall(true)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
 
   if (!user) {
     return <NamePicker onPick={setUser} />
@@ -36,7 +48,23 @@ export default function App() {
             </span>
             
           </h1>
-          <UserSwitch user={user} setUser={setUser} />
+          <div className="flex items-center gap-2">
+            {showInstall && (
+              <button
+                onClick={async () => {
+                  if (!deferredPrompt) return
+                  deferredPrompt.prompt()
+                  const choice = await deferredPrompt.userChoice
+                  setShowInstall(false)
+                  setDeferredPrompt(null)
+                }}
+                className="px-3 py-1 rounded-full border border-line text-sm bg-ink/5"
+              >
+                Instalar
+              </button>
+            )}
+            <UserSwitch user={user} setUser={setUser} />
+          </div>
         </div>
         <nav className="max-w-3xl mx-auto px-4 hidden sm:flex gap-1 -mb-px justify-center">
           {TABS.map((t) => (
