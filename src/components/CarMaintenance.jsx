@@ -204,9 +204,11 @@ export default function CarMaintenance({ user }) {
         </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-2 bg-ink text-white px-4 py-2 rounded-full text-sm font-medium"
+          aria-label="Registrar"
+          title="Registrar"
+          className="flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full text-sm font-medium"
         >
-          <Plus size={16} /> Registrar
+          <Plus size={16} />
         </button>
       </div>
 

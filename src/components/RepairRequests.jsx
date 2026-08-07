@@ -237,7 +237,7 @@ export default function Tasks({ user }) {
         <div className="mt-3">
           <ul className="mt-2 space-y-2">
             {[...completedRequests].sort(sortByPriorityThenId).map((req) => (
-              <li key={`c-${req.id}`} className={`rounded-card overflow-hidden ${req.priority === 'alta' ? 'bg-coral-light border-coral/30' : req.priority === 'baixa' ? 'bg-blue-50 border-blue-100' : 'bg-white border-line'}`}>
+              <li key={`c-${req.id}`} className={`rounded-card overflow-hidden ${req.priority === 'baixa' ? 'bg-green-50 border-green-100' : 'bg-white border-line'}`}>
                 <div className="flex items-center justify-between gap-3 px-4 py-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -257,6 +257,7 @@ export default function Tasks({ user }) {
       {showForm && (
         <div className="bg-white border border-line rounded-card p-4 space-y-3">
           <input
+            placeholder="Nome da tarefa"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             className="w-full rounded-full border border-line px-4 py-2 text-sm"
@@ -274,7 +275,11 @@ export default function Tasks({ user }) {
                 key={p.key}
                 onClick={() => setForm({ ...form, priority: p.key })}
                 className={`px-3 py-1.5 rounded-full text-xs border ${
-                  form.priority === p.key ? 'bg-teal text-white border-teal' : 'border-line text-ink/60'
+                  form.priority === p.key
+                    ? p.key === 'baixa'
+                      ? 'bg-green-50 text-green-800 border-green-100'
+                      : 'bg-coral-light text-coral border-coral/30'
+                    : 'border-line text-ink/60'
                 }`}
               >
                 {p.label}
@@ -351,7 +356,7 @@ export default function Tasks({ user }) {
             const priorityBadge = req.priority === 'alta'
               ? 'bg-coral-light text-coral border-coral/30'
               : 'bg-base text-ink/60 border-line'
-            const cardBg = req.priority === 'alta' ? 'bg-coral-light border-coral/30' : req.priority === 'baixa' ? 'bg-blue-50 border-blue-100' : 'bg-white border-line'
+            const cardBg = req.priority === 'baixa' ? 'bg-green-50 border-green-100' : 'bg-white border-line'
             return (
               <li key={req.id} className={`rounded-card overflow-hidden ${cardBg}`}>
                 <div className={`flex items-start justify-between gap-3 px-4 ${isOpen ? 'py-3' : 'py-2'}`}>
