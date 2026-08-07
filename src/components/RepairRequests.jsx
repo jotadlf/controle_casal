@@ -41,8 +41,50 @@ export default function Tasks({ user }) {
     const { data, error } = await supabase.from('repair_requests').select('*').order('id', { ascending: false })
     if (error) {
       console.error('Falha ao carregar tarefas:', error)
+      setRequests([])
+      setLoading(false)
+      return
     }
-    setRequests(data || [])
+
+    // função utilitária para parsear datas em formatos variados
+    const parseDue = (raw) => {
+      if (!raw) return null
+      const s = String(raw)
+      const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+      if (isoMatch) return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]))
+      const d = new Date(s)
+      if (!isNaN(d.getTime())) return d
+      const maybe = s.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+      if (maybe) return new Date(Number(maybe[1]), Number(maybe[2]) - 1, Number(maybe[3]))
+      return null
+    }
+
+    const now = new Date()
+    const MS_PER_DAY = 1000 * 60 * 60 * 24
+    const toUpdate = []
+
+    const normalized = (data || []).map((t) => {
+      const due = parseDue(t.due_date)
+      if (due) {
+        const daysPast = Math.floor((now.getTime() - due.getTime()) / MS_PER_DAY)
+        if (daysPast > 4 && t.priority !== 'alta') {
+          toUpdate.push(t.id)
+          return { ...t, priority: 'alta' }
+        }
+      }
+      return t
+    })
+
+    // aplicar updates no banco de forma assíncrona (não aguardamos para não bloquear render)
+    if (toUpdate.length > 0) {
+      Promise.all(
+        toUpdate.map((id) =>
+          supabase.from('repair_requests').update({ priority: 'alta' }).eq('id', id)
+        )
+      ).catch((e) => console.error('Falha ao escalonar prioridades:', e))
+    }
+
+    setRequests(normalized)
     setLoading(false)
   }
 
@@ -173,16 +215,17 @@ export default function Tasks({ user }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-            <h2 className="font-display font-semibold text-xl text-ink">Tarefas</h2>
-            <p className="text-sm text-ink/60">Tarefas gerais (reparos, pendências de casa, documentos, pessoais).</p>
-          </div>
-          <button
-            onClick={() => setShowForm((v) => !v)}
-            className="flex items-center gap-2 bg-ink text-white px-4 py-2 rounded-full text-sm font-medium"
-          >
-            <Plus size={16} /> Nova tarefa
-          </button>
+          <h2 className="font-display font-semibold text-xl text-ink">Tarefas</h2>
         </div>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          aria-label="Nova tarefa"
+          title="Nova tarefa"
+          className="flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full text-sm font-medium"
+        >
+          <Plus size={16} />
+        </button>
+      </div>
       {alert && (
         <div className={`rounded-card border px-4 py-3 text-sm flex items-start justify-between gap-3 ${
           alert.type === 'error'
@@ -220,10 +263,10 @@ export default function Tasks({ user }) {
                     <div className="flex items-center gap-2">
                       <p className="text-sm text-ink truncate">{req.title}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${req.priority === 'alta' ? 'bg-coral-light text-coral border-coral/30' : 'bg-base text-ink/60 border-line'}`}>{req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${'bg-teal-light text-teal-dark border-teal/20'} ml-2`}>{'Concluído'}</span>
                     </div>
                     {req.description && <p className="text-xs text-ink/50 mt-0.5 line-clamp-1">{req.description}</p>}
                   </div>
-                  <div className="text-xs text-ink/40">{req.requested_by}</div>
                 </div>
               </li>
             ))}
@@ -335,6 +378,7 @@ export default function Tasks({ user }) {
                     <div className="flex items-center gap-2">
                       <p className={`font-medium text-ink ${isOpen ? '' : 'text-sm truncate'}`}>{req.title}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${priorityBadge}`}> {req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${colorMap[statusInfo.color]} ml-2`}>{statusInfo.label}</span>
                     </div>
                     {isOpen ? (
                       <>
@@ -360,7 +404,7 @@ export default function Tasks({ user }) {
                 </div>
 
                 <div className="flex gap-2 px-4 pb-3">
-                  {STATUS.map((s) => (
+                  {isOpen && STATUS.map((s) => (
                     <button
                       key={s.key}
                       onClick={() => updateStatus(req, s.key)}

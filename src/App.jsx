@@ -1,15 +1,13 @@
 import { useState } from 'react'
-import { ShoppingCart, Receipt, Car, ListChecks, Calendar as CalendarIcon, Users, Heart, Cat } from 'lucide-react'
+import { ShoppingCart, Receipt, Car, ListChecks, Users, Heart, Cat } from 'lucide-react'
 import UserSwitch, { useCurrentUser } from './components/UserSwitch'
 import ShoppingList from './components/ShoppingList'
 import Bills from './components/Bills'
 import CarMaintenance from './components/CarMaintenance'
 import RepairRequests from './components/RepairRequests'
-import Calendar from './components/Calendar'
 
 const TABS = [
   { key: 'compras', label: 'Compras', icon: ShoppingCart, Component: ShoppingList },
-  { key: 'calendario', label: 'Calendário', icon: CalendarIcon, Component: Calendar },
   { key: 'contas', label: 'Contas', icon: Receipt, Component: Bills },
   { key: 'carro', label: 'Carro', icon: Car, Component: CarMaintenance },
   { key: 'tarefas', label: 'Tarefas', icon: ListChecks, Component: RepairRequests },
