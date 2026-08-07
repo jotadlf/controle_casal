@@ -110,7 +110,7 @@ export default function Calendar() {
         <div className="grid grid-cols-7 gap-2">
           {/* leading empty cells */}
           {Array.from({ length: monthData.firstDayWeekday }).map((_, i) => (
-            <div key={'e'+i} className="p-2"></div>
+            <div key={'e'+i} className="p-2 border rounded-card text-left min-h-[60px] bg-white" aria-hidden />
           ))}
           {Array.from({ length: monthData.daysInMonth }).map((_, idx) => {
             const day = idx + 1

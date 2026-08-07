@@ -337,19 +337,19 @@ export default function Tasks({ user }) {
                       <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${priorityBadge}`}> {req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
                     </div>
                     {isOpen ? (
-                      req.description && <p className="text-sm text-ink/50 mt-0.5">{req.description}</p>
-                    ) : (
-                      req.description && <p className="text-xs text-ink/50 mt-0.5 line-clamp-1">{req.description}</p>
-                    )}
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${colorMap[statusInfo.color]}`}>
-                        {statusInfo.label}
-                      </span>
-                      <span className="text-xs text-ink/40 font-mono">Pedido por {req.requested_by}</span>
-                      {req.assigned_to && (
-                        <span className="text-xs text-ink/40 font-mono">→ {req.assigned_to}</span>
-                      )}
-                    </div>
+                      <>
+                        {req.description && <p className="text-sm text-ink/50 mt-0.5">{req.description}</p>}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${colorMap[statusInfo.color]}`}>
+                            {statusInfo.label}
+                          </span>
+                          <span className="text-xs text-ink/40 font-mono">Pedido por {req.requested_by}</span>
+                          {req.assigned_to && (
+                            <span className="text-xs text-ink/40 font-mono">→ {req.assigned_to}</span>
+                          )}
+                        </div>
+                      </>
+                    ) : null}
                   </div>
                   <button
                     onClick={() => removeRequest(req.id)}
