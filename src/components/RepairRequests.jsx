@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, X } from 'lucide-react'
+import { Plus, Trash2, Archive, X } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { EmptyState } from './ShoppingList'
 import { USERS } from './UserSwitch'
@@ -195,14 +195,24 @@ export default function Tasks({ user }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div />
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          aria-label="Nova tarefa"
-          title="Nova tarefa"
-          className="flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full text-sm font-medium"
-        >
-          <Plus size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            aria-label="Nova tarefa"
+            title="Nova tarefa"
+            className="flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full text-sm font-medium"
+          >
+            <Plus size={16} />
+          </button>
+          <button
+            onClick={() => setShowCompletedPanel((v) => !v)}
+            aria-label="Arquivados"
+            title="Arquivados"
+            className="flex items-center justify-center bg-ink/5 text-ink w-10 h-10 rounded-full text-sm font-medium border border-line"
+          >
+            <Archive size={16} />
+          </button>
+        </div>
       </div>
       {alert && (
         <div className={`rounded-card border px-4 py-3 text-sm flex items-start justify-between gap-3 ${
@@ -223,15 +233,8 @@ export default function Tasks({ user }) {
         </div>
       )}
 
-      <div>
-        <button
-          onClick={() => setShowCompletedPanel((v) => !v)}
-          className="mt-3 px-3 py-1 rounded-full border text-sm bg-white"
-        >
-          Concluídos ({completedRequests.length}) {showCompletedPanel ? '▲' : '▼'}
-        </button>
-
-        {showCompletedPanel && (
+      {showCompletedPanel && (
+        <div className="mt-3">
           <ul className="mt-2 space-y-2">
             {[...completedRequests].sort(sortByPriorityThenId).map((req) => (
               <li key={`c-${req.id}`} className={`rounded-card overflow-hidden ${req.priority === 'alta' ? 'bg-coral-light border-coral/30' : req.priority === 'baixa' ? 'bg-blue-50 border-blue-100' : 'bg-white border-line'}`}>
@@ -248,8 +251,8 @@ export default function Tasks({ user }) {
               </li>
             ))}
           </ul>
-        )}
-      </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="bg-white border border-line rounded-card p-4 space-y-3">
@@ -362,9 +365,6 @@ export default function Tasks({ user }) {
                       <>
                         {req.description && <p className="text-sm text-ink/50 mt-0.5">{req.description}</p>}
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${colorMap[statusInfo.color]}`}>
-                            {statusInfo.label}
-                          </span>
                           <span className="text-xs text-ink/40 font-mono">Pedido por {req.requested_by}</span>
                           {req.assigned_to && (
                             <span className="text-xs text-ink/40 font-mono">→ {req.assigned_to}</span>
