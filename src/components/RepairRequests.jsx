@@ -34,6 +34,7 @@ export default function Tasks({ user }) {
   })
   const [filter, setFilter] = useState('todos')
   const [alert, setAlert] = useState(null)
+  const [showCompletedPanel, setShowCompletedPanel] = useState(false)
 
   async function loadAll() {
     setLoading(true)
@@ -152,7 +153,21 @@ export default function Tasks({ user }) {
     setCommentDraft('')
   }
 
-  const filtered = requests.filter((r) => filter === 'todos' || r.status === filter)
+  // by default 'todos' shows only non-concluded tasks; concluded tasks live in a separate panel
+  const filtered = requests.filter((r) =>
+    filter === 'todos' ? r.status !== 'concluido' : filter === 'todos' || r.status === filter
+  )
+
+  const completedRequests = requests.filter((r) => r.status === 'concluido')
+
+  const priorityRank = (p) => (p === 'alta' ? 1 : 0)
+
+  const sortByPriorityThenId = (a, b) => {
+    const pa = priorityRank(a.priority)
+    const pb = priorityRank(b.priority)
+    if (pa !== pb) return pb - pa // alta first
+    return (b.id || 0) - (a.id || 0)
+  }
 
   return (
     <div className="space-y-5">
@@ -186,6 +201,35 @@ export default function Tasks({ user }) {
           </button>
         </div>
       )}
+        }
+
+      <div>
+        <button
+          onClick={() => setShowCompletedPanel((v) => !v)}
+          className="mt-3 px-3 py-1 rounded-full border text-sm bg-white"
+        >
+          Concluídos ({completedRequests.length}) {showCompletedPanel ? '▲' : '▼'}
+        </button>
+
+        {showCompletedPanel && (
+          <ul className="mt-2 space-y-2">
+            {[...completedRequests].sort(sortByPriorityThenId).map((req) => (
+              <li key={`c-${req.id}`} className="bg-white rounded-card border border-line overflow-hidden">
+                <div className="flex items-center justify-between gap-3 px-4 py-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-ink truncate">{req.title}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${req.priority === 'alta' ? 'bg-coral-light text-coral border-coral/30' : 'bg-base text-ink/60 border-line'}`}>{req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
+                    </div>
+                    {req.description && <p className="text-xs text-ink/50 mt-0.5 line-clamp-1">{req.description}</p>}
+                  </div>
+                  <div className="text-xs text-ink/40">{req.requested_by}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {showForm && (
         <div className="bg-white border border-line rounded-card p-4 space-y-3">
@@ -273,7 +317,7 @@ export default function Tasks({ user }) {
         <EmptyState text="Nada por aqui. Crie o primeiro pedido acima." />
       ) : (
         <ul className="space-y-2">
-          {filtered.map((req) => {
+          {[...filtered].sort(sortByPriorityThenId).map((req) => {
             const statusInfo = STATUS.find((s) => s.key === req.status)
             const colorMap = {
               coral: 'bg-coral-light text-coral border-coral/30',
@@ -281,12 +325,22 @@ export default function Tasks({ user }) {
               teal: 'bg-teal-light text-teal-dark border-teal/20',
             }
             const isOpen = openId === req.id
+            const priorityBadge = req.priority === 'alta'
+              ? 'bg-coral-light text-coral border-coral/30'
+              : 'bg-base text-ink/60 border-line'
             return (
               <li key={req.id} className="bg-white rounded-card border border-line overflow-hidden">
-                <div className="flex items-start justify-between gap-3 px-4 py-3">
+                <div className={`flex items-start justify-between gap-3 px-4 ${isOpen ? 'py-3' : 'py-2'}`}>
                   <div className="min-w-0 flex-1 cursor-pointer" onClick={() => toggleOpen(req.id)}>
-                    <p className="font-medium text-ink">{req.title}</p>
-                    {req.description && <p className="text-sm text-ink/50 mt-0.5">{req.description}</p>}
+                    <div className="flex items-center gap-2">
+                      <p className={`font-medium text-ink ${isOpen ? '' : 'text-sm truncate'}`}>{req.title}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${priorityBadge}`}> {req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
+                    </div>
+                    {isOpen ? (
+                      req.description && <p className="text-sm text-ink/50 mt-0.5">{req.description}</p>
+                    ) : (
+                      req.description && <p className="text-xs text-ink/50 mt-0.5 line-clamp-1">{req.description}</p>
+                    )}
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                       <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${colorMap[statusInfo.color]}`}>
                         {statusInfo.label}
