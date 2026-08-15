@@ -292,21 +292,15 @@ export default function Tasks({ user }) {
         <div className="mt-3">
           <ul className="mt-2 space-y-2">
             {[...completedRequests].sort(sortByPriorityThenId).map((req) => (
-              <li key={`c-${req.id}`} className="rounded-card overflow-hidden bg-white border border-line">
-                <div className="flex items-center justify-between gap-3 px-4 py-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      {req.priority === 'alta' && (
-                        <AlertCircle size={14} className="text-coral shrink-0" aria-label="Prioridade alta" />
-                      )}
-                      <p className="text-sm text-ink/50 truncate line-through">{req.title}</p>
-                    </div>
-                    {req.description && <p className="text-xs text-ink/40 mt-0.5 line-clamp-1">{req.description}</p>}
-                  </div>
+              <li key={`c-${req.id}`} className="flex items-center gap-3 rounded-card overflow-hidden bg-white border border-line px-4 py-2">
+                <span className="shrink-0 inline-block w-2 h-2 rounded-full bg-teal" title="Concluído" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-ink/50 truncate line-through">{req.title}</p>
+                  {req.description && <p className="text-xs text-ink/40 mt-0.5 line-clamp-1">{req.description}</p>}
                 </div>
-                <div className="px-4 pb-2">
-                  <span className="inline-block w-2 h-2 rounded-full bg-teal" title="Concluído" />
-                </div>
+                {req.priority === 'alta' && (
+                  <AlertCircle size={14} className="shrink-0 text-coral" aria-label="Prioridade alta" />
+                )}
               </li>
             ))}
           </ul>
@@ -410,19 +404,22 @@ export default function Tasks({ user }) {
             const hasDetails = Boolean(req.description || req.assigned_to)
             const isDragging = drag.id === req.id
             const dragX = isDragging ? drag.x : 0
+            const isActiveDrag = isDragging && drag.dragging
             return (
               <li key={req.id} className="relative rounded-card overflow-hidden">
                 <div className="absolute inset-0 flex items-center justify-between px-5">
-                  <span className={`flex items-center gap-1.5 text-coral text-xs font-medium transition-opacity ${dragX < -12 ? 'opacity-100' : 'opacity-0'}`}>
-                    <Trash2 size={16} /> Remover
-                  </span>
-                  <span className={`flex items-center gap-1.5 text-teal-dark text-xs font-medium ml-auto transition-opacity ${dragX > 12 ? 'opacity-100' : 'opacity-0'}`}>
-                    Concluir <Check size={16} />
-                  </span>
+                  <Trash2
+                    size={18}
+                    className={`text-coral transition-all ${isActiveDrag ? 'opacity-100' : 'opacity-0'} ${dragX < -DRAG_THRESHOLD ? 'scale-125' : 'scale-100'}`}
+                  />
+                  <Check
+                    size={18}
+                    className={`text-teal-dark transition-all ${isActiveDrag ? 'opacity-100' : 'opacity-0'} ${dragX > DRAG_THRESHOLD ? 'scale-125' : 'scale-100'}`}
+                  />
                 </div>
 
                 <div
-                  className={`relative bg-white border border-line rounded-card ${hasDetails ? 'cursor-pointer' : ''}`}
+                  className={`relative flex items-center gap-3 bg-white border border-line rounded-card ${hasDetails ? 'cursor-pointer' : ''}`}
                   style={{
                     transform: `translateX(${dragX}px)`,
                     transition: isDragging && drag.dragging ? 'none' : 'transform 0.2s ease',
@@ -433,15 +430,15 @@ export default function Tasks({ user }) {
                   onPointerUp={(e) => handleDragEnd(e, req.id, req)}
                   onPointerCancel={() => setDrag({ id: null, x: 0, dragging: false })}
                 >
-                  <div className={`px-4 ${isOpen ? 'py-3' : 'py-2'}`}>
-                    <div className="flex items-center gap-1.5">
-                      {req.priority === 'alta' && (
-                        <AlertCircle size={14} className="text-coral shrink-0" aria-label="Prioridade alta" />
-                      )}
-                      <p className={`font-medium text-ink ${isOpen ? '' : 'text-sm truncate'} ${isDone ? 'line-through text-ink/40' : ''}`}>
-                        {req.title}
-                      </p>
-                    </div>
+                  <span
+                    className={`shrink-0 ml-4 inline-block w-2 h-2 rounded-full ${isDone ? 'bg-teal' : 'bg-ink/20'}`}
+                    title={isDone ? 'Concluído' : 'Pendente'}
+                  />
+
+                  <div className={`min-w-0 flex-1 px-4 ${isOpen ? 'py-3' : 'py-2'}`}>
+                    <p className={`font-medium text-ink ${isOpen ? '' : 'text-sm truncate'} ${isDone ? 'line-through text-ink/40' : ''}`}>
+                      {req.title}
+                    </p>
                     {isOpen ? (
                       <>
                         {req.description && <p className="text-sm text-ink/50 mt-1">{req.description}</p>}
@@ -455,12 +452,9 @@ export default function Tasks({ user }) {
                     ) : null}
                   </div>
 
-                  <div className="px-4 pb-2.5">
-                    <span
-                      className={`inline-block w-2 h-2 rounded-full ${isDone ? 'bg-teal' : 'bg-coral'}`}
-                      title={isDone ? 'Concluído' : 'Pendente'}
-                    />
-                  </div>
+                  {req.priority === 'alta' && (
+                    <AlertCircle size={14} className="shrink-0 mr-4 text-coral" aria-label="Prioridade alta" />
+                  )}
                 </div>
               </li>
             )

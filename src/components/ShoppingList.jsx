@@ -6,6 +6,8 @@ import { currentReferenceMonth } from '../lib/bills'
 import PurchaseModal from './PurchaseModal'
 import Modal from './Modal'
 
+const DRAG_THRESHOLD = 88
+
 export default function ShoppingList({ user }) {
   const [items, setItems] = useState([])
   const [purchases, setPurchases] = useState([])
@@ -166,6 +168,47 @@ export default function ShoppingList({ user }) {
     setPurchaseTarget(item)
   }
 
+  // arrastar card: direita = marcar como comprado, esquerda = remover
+  const dragStartX = useRef(0)
+  const [drag, setDrag] = useState({ id: null, x: 0, dragging: false })
+
+  function handleDragStart(e, id) {
+    if (purchaseTarget) return
+    dragStartX.current = e.clientX
+    setDrag({ id, x: 0, dragging: true })
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handleDragMove(e, id) {
+    if (!drag.dragging || drag.id !== id) return
+    const dx = e.clientX - dragStartX.current
+    setDrag((d) => (d.id === id ? { ...d, x: dx } : d))
+  }
+
+  function handleDragEnd(e, id, item) {
+    if (drag.id !== id) return
+    const dx = drag.x
+
+    if (!drag.dragging) return
+
+    if (dx > DRAG_THRESHOLD) {
+      setDrag({ id: null, x: 0, dragging: false })
+      markPurchased(item)
+      return
+    }
+
+    if (dx < -DRAG_THRESHOLD) {
+      setDrag({ id, x: -600, dragging: false })
+      setTimeout(() => {
+        removeItem(item.id)
+        setDrag({ id: null, x: 0, dragging: false })
+      }, 180)
+      return
+    }
+
+    setDrag({ id: null, x: 0, dragging: false })
+  }
+
   async function confirmPurchase({ price = null, unit = null, quantity = 1 }) {
     if (!purchaseTarget) return
     const item = purchaseTarget
@@ -283,6 +326,7 @@ export default function ShoppingList({ user }) {
         <div>
           <h2 className="font-display font-semibold text-xl text-ink">Lista de compras</h2>
           <p className="text-sm text-ink/60">Previsão automática baseada no histórico de compras.</p>
+          <p className="text-xs text-ink/40 mt-0.5">Arraste um item para a direita pra comprar, para a esquerda pra remover.</p>
         </div>
       </div>
       {alert && (
@@ -379,50 +423,56 @@ export default function ShoppingList({ user }) {
             const alreadyBoughtToday = purchases.some(
               (p) => p.item_id === item.id && p.purchased_at === today,
             )
+            const isDragging = drag.id === item.id
+            const isActiveDrag = isDragging && drag.dragging
+            const dragX = isDragging ? drag.x : 0
             return (
-              <li
-                key={item.id}
-                className="flex items-center justify-between gap-3 bg-white rounded-card border border-line px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className={`font-medium truncate ${alreadyBoughtToday ? 'text-ink/40 line-through' : 'text-ink'}`}>
-                    {item.name}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[u.color]}`}>
-                      {u.label}
-                    </span>
-                    {item.analysis.timesBought > 0 && (() => {
-                      const itemPurchs = purchases
-                        .filter((p) => p.item_id === item.id)
-                        .sort((a, b) => new Date(a.purchased_at) - new Date(b.purchased_at))
-                      const last = itemPurchs[itemPurchs.length - 1]
-                      const store = last?.shopping_sessions?.store_name
-                      return (
-                        <span className="text-xs text-ink/40">
-                          {item.analysis.timesBought}x comprado{store ? ` · ${store}` : ''}
-                        </span>
-                      )
-                    })()}
-                  </div>
+              <li key={item.id} className="relative rounded-card overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-between px-5">
+                  <Trash2
+                    size={18}
+                    className={`text-coral transition-all ${isActiveDrag ? 'opacity-100' : 'opacity-0'} ${dragX < -DRAG_THRESHOLD ? 'scale-125' : 'scale-100'}`}
+                  />
+                  <Check
+                    size={18}
+                    className={`text-teal-dark transition-all ${isActiveDrag ? 'opacity-100' : 'opacity-0'} ${dragX > DRAG_THRESHOLD ? 'scale-125' : 'scale-100'}`}
+                  />
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={() => markPurchased(item)}
-                    disabled={!!purchaseTarget}
-                    className="p-2 rounded-full bg-teal/10 text-teal hover:bg-teal hover:text-white transition-colors"
-                    aria-label="Marcar como comprado"
-                    title="Marcar como comprado hoje"
-                  >
-                    <Check size={16} />
-                  </button>
-                  <button
-                    onClick={() => removeItem(item.id)}
-                    className="p-2 rounded-full text-ink/30 hover:bg-coral-light hover:text-coral transition-colors"
-                    aria-label="Remover item"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+
+                <div
+                  className="relative flex items-center justify-between gap-3 bg-white rounded-card border border-line px-4 py-3"
+                  style={{
+                    transform: `translateX(${dragX}px)`,
+                    transition: isActiveDrag ? 'none' : 'transform 0.2s ease',
+                    touchAction: 'pan-y',
+                  }}
+                  onPointerDown={(e) => handleDragStart(e, item.id)}
+                  onPointerMove={(e) => handleDragMove(e, item.id)}
+                  onPointerUp={(e) => handleDragEnd(e, item.id, item)}
+                  onPointerCancel={() => setDrag({ id: null, x: 0, dragging: false })}
+                >
+                  <div className="min-w-0">
+                    <p className={`font-medium truncate ${alreadyBoughtToday ? 'text-ink/40 line-through' : 'text-ink'}`}>
+                      {item.name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[u.color]}`}>
+                        {u.label}
+                      </span>
+                      {item.analysis.timesBought > 0 && (() => {
+                        const itemPurchs = purchases
+                          .filter((p) => p.item_id === item.id)
+                          .sort((a, b) => new Date(a.purchased_at) - new Date(b.purchased_at))
+                        const last = itemPurchs[itemPurchs.length - 1]
+                        const store = last?.shopping_sessions?.store_name
+                        return (
+                          <span className="text-xs text-ink/40">
+                            {item.analysis.timesBought}x comprado{store ? ` · ${store}` : ''}
+                          </span>
+                        )
+                      })()}
+                    </div>
+                  </div>
                 </div>
               </li>
             )
