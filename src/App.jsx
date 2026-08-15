@@ -82,12 +82,13 @@ export default function App() {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium ${
+            aria-label={t.label}
+            title={t.label}
+            className={`flex-1 flex items-center justify-center py-3.5 ${
               tab === t.key ? 'text-teal-dark' : 'text-ink/40'
             }`}
           >
-            <t.icon size={20} />
-            {t.label}
+            <t.icon size={22} />
           </button>
         ))}
       </nav>

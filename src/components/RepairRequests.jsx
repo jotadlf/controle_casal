@@ -3,6 +3,7 @@ import { Plus, Trash2, Check, Archive, X, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { EmptyState } from './ShoppingList'
 import { USERS } from './UserSwitch'
+import Modal from './Modal'
 
 const STATUS = [
   { key: 'pendente', label: 'Pendente', color: 'coral' },
@@ -13,8 +14,6 @@ const PRIORITY = [
   { key: 'baixa', label: 'Baixa' },
   { key: 'alta', label: 'Alta' },
 ]
-
-const CATEGORY_OPTIONS = ['Casa', 'Trabalho', 'Pessoal', 'Outro']
 
 const DRAG_THRESHOLD = 88
 const CLICK_THRESHOLD = 6
@@ -29,9 +28,8 @@ export default function Tasks({ user }) {
     description: '',
     priority: 'baixa',
     assigned_to: '',
-    category: 'Casa',
-    due_date: '',
   })
+  const [formError, setFormError] = useState('')
   const [filter, setFilter] = useState('todos')
   const [alert, setAlert] = useState(null)
   const [showCompletedPanel, setShowCompletedPanel] = useState(false)
@@ -152,7 +150,10 @@ export default function Tasks({ user }) {
   }
 
   async function addRequest() {
-    if (!form.title.trim()) return
+    if (!form.title.trim()) {
+      setFormError('Informe o nome da tarefa.')
+      return
+    }
 
     const basePayload = {
       title: form.title.trim(),
@@ -164,8 +165,8 @@ export default function Tasks({ user }) {
 
     const enrichPayload = (payload) => {
       if (form.assigned_to) payload.assigned_to = form.assigned_to
-      if (form.category) payload.category = form.category
-      if (form.due_date) payload.due_date = form.due_date
+      // due_date não é escolhido pelo usuário: guarda a data de criação só como registro
+      payload.due_date = new Date().toISOString().slice(0, 10)
       return payload
     }
 
@@ -176,7 +177,7 @@ export default function Tasks({ user }) {
     let { data, error } = await tryInsert(payload)
 
     const isMissingColumnError = (message) =>
-      /could not find the '(assigned_to|category|due_date)' column of 'repair_requests' in the schema cache|column .* does not exist/i.test(message)
+      /could not find the '(assigned_to|due_date)' column of 'repair_requests' in the schema cache|column .* does not exist/i.test(message)
 
     if (error && isMissingColumnError(error.message)) {
       const retry = await tryInsert({ ...basePayload })
@@ -193,16 +194,14 @@ export default function Tasks({ user }) {
 
     if (error) {
       console.error('Erro ao criar tarefa:', error)
-      setAlert({
-        type: 'error',
-        message: `Falha ao criar tarefa: ${error.message}`,
-      })
+      setFormError(`Falha ao criar tarefa: ${error.message}`)
       return
     }
 
     if (data) {
       setRequests((prev) => [data, ...prev])
-      setForm({ title: '', description: '', priority: 'baixa', assigned_to: '', category: 'Casa', due_date: '' })
+      setForm({ title: '', description: '', priority: 'baixa', assigned_to: '' })
+      setFormError('')
       setShowForm(false)
       if (!alert || alert.type !== 'info') {
         setAlert({ type: 'info', message: 'Tarefa criada com sucesso.' })
@@ -252,7 +251,7 @@ export default function Tasks({ user }) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowForm((v) => !v)}
+            onClick={() => { setFormError(''); setShowForm(true) }}
             aria-label="Nova tarefa"
             title="Nova tarefa"
             className="flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full text-sm font-medium"
@@ -308,49 +307,64 @@ export default function Tasks({ user }) {
       )}
 
       {showForm && (
-        <div className="bg-white border border-line rounded-card p-4 space-y-3">
-          <input
-            placeholder="Nome da tarefa"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="w-full rounded-full border border-line px-4 py-2 text-sm"
-          />
-          <textarea
-            placeholder="Detalhes (opcional)"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            rows={2}
-            className="w-full rounded-2xl border border-line px-4 py-2 text-sm resize-none"
-          />
-          <div className="flex gap-2 flex-wrap">
-            {PRIORITY.map((p) => (
+        <Modal
+          title="Nova tarefa"
+          onClose={() => { setShowForm(false); setFormError('') }}
+          footer={
+            <div className="flex gap-2">
               <button
-                key={p.key}
-                onClick={() => setForm({ ...form, priority: p.key })}
-                className={`px-3 py-1.5 rounded-full text-xs border ${
-                  form.priority === p.key
-                    ? p.key === 'baixa'
-                      ? 'bg-ink/5 text-ink/70 border-line'
-                      : 'bg-coral-light text-coral border-coral/30'
-                    : 'border-line text-ink/60'
-                }`}
+                onClick={() => { setShowForm(false); setFormError('') }}
+                className="flex-1 py-2 rounded-full border border-line text-sm"
               >
-                {p.label}
+                Cancelar
               </button>
-            ))}
-            <select
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="rounded-full border border-line px-3 py-1.5 text-xs bg-white"
-            >
-              {CATEGORY_OPTIONS.map((c) => (
-                <option key={c} value={c}>{c}</option>
+              <button onClick={addRequest} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+                Criar tarefa
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <input
+                placeholder="Nome da tarefa"
+                value={form.title}
+                onChange={(e) => {
+                  setForm({ ...form, title: e.target.value })
+                  if (formError) setFormError('')
+                }}
+                className={`w-full rounded-full border px-4 py-2 text-sm ${formError ? 'border-coral' : 'border-line'}`}
+              />
+              {formError && <p className="text-xs text-coral mt-1 px-1">{formError}</p>}
+            </div>
+            <textarea
+              placeholder="Detalhes (opcional)"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              rows={2}
+              className="w-full rounded-2xl border border-line px-4 py-2 text-sm resize-none"
+            />
+            <div className="flex gap-2">
+              {PRIORITY.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => setForm({ ...form, priority: p.key })}
+                  className={`px-3 py-1.5 rounded-full text-xs border ${
+                    form.priority === p.key
+                      ? p.key === 'baixa'
+                        ? 'bg-ink/5 text-ink/70 border-line'
+                        : 'bg-coral-light text-coral border-coral/30'
+                      : 'border-line text-ink/60'
+                  }`}
+                >
+                  {p.label}
+                </button>
               ))}
-            </select>
+            </div>
             <select
               value={form.assigned_to}
               onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}
-              className="rounded-full border border-line px-3 py-1.5 text-xs bg-white"
+              className="w-full rounded-full border border-line px-4 py-2 text-sm bg-white"
             >
               <option value="">Atribuir a...</option>
               {USERS.map((u) => (
@@ -360,18 +374,7 @@ export default function Tasks({ user }) {
               ))}
             </select>
           </div>
-          <div className="flex gap-2">
-            <input
-              type="date"
-              value={form.due_date}
-              onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-              className="rounded-full border border-line px-3 py-2 text-sm"
-            />
-            <button onClick={addRequest} className="flex-1 bg-ink text-white rounded-full py-2 text-sm font-medium">
-              Criar tarefa
-            </button>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <div className="flex gap-2 text-xs flex-wrap">
