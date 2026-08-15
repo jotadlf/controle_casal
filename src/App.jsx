@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ShoppingCart, Receipt, Car, ListChecks, Users, Heart, Cat } from 'lucide-react'
+import { ShoppingCart, Receipt, Car, ListChecks } from 'lucide-react'
 import UserSwitch, { useCurrentUser } from './components/UserSwitch'
 import ShoppingList from './components/ShoppingList'
 import Bills from './components/Bills'
@@ -39,15 +39,7 @@ export default function App() {
     <div className="min-h-screen bg-base pb-24 sm:pb-0">
       <header className="border-b border-line bg-white sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="font-display font-bold text-lg text-ink tracking-tight">
-            Casa
-            <span className="ml-3 inline-flex items-center gap-1" aria-hidden>
-              <Users size={16} />
-              <Heart size={16} className="text-coral" />
-              <Cat size={16} />
-            </span>
-            
-          </h1>
+          <h1 className="font-display font-bold text-lg text-ink tracking-tight">Casa</h1>
           <div className="flex items-center gap-2">
             {showInstall && (
               <button

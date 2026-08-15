@@ -13,7 +13,7 @@ export default function PurchaseModal({ item, defaultPrice = '', defaultUnit = '
       footer={
         <div className="flex gap-2">
           <button onClick={onCancel} className="flex-1 py-2 rounded-full border border-line text-sm">Cancelar</button>
-          <button onClick={() => onConfirm({ price: price || null, unit: unit || null, quantity })} className="flex-1 py-2 rounded-full bg-teal text-white text-sm">Salvar</button>
+          <button onClick={() => onConfirm({ price: price || null, unit: unit || null, quantity })} className="flex-1 py-2 rounded-full bg-ink text-white text-sm">Salvar</button>
         </div>
       }
     >

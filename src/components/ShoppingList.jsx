@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Check, Trash2, TrendingUp, X } from 'lucide-react'
+import { Plus, Check, Trash2, X } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { analyzeItem, urgencyLabel } from '../lib/predict'
 import { currentReferenceMonth } from '../lib/bills'
@@ -310,12 +310,12 @@ export default function ShoppingList({ user }) {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <span className="text-sm text-ink/70">Comprando em: <strong>{shoppingSessionStore}</strong></span>
               <span className="text-sm text-ink/70">Total: <strong>{formatCurrency(sessionTotal)}</strong></span>
-              <button onClick={endSession} className="rounded-full px-3 py-1 text-xs bg-coral text-white hover:bg-coral-dark transition-colors">Finalizar</button>
+              <button onClick={endSession} className="rounded-full px-3 py-1 text-xs bg-ink text-white hover:bg-ink/80 transition-colors">Finalizar</button>
             </div>
           ) : (
             <button
               onClick={() => setShowSessionModal(true)}
-              className="rounded-full px-3 py-1 text-xs bg-amber text-white hover:bg-amber-dark transition-colors"
+              className="rounded-full px-3 py-1 text-xs border border-line text-ink/70 hover:bg-ink/5 transition-colors"
             >
               Iniciar Compras
             </button>
@@ -389,26 +389,21 @@ export default function ShoppingList({ user }) {
                     {item.name}
                   </p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${colorMap[u.color]}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[u.color]}`}>
                       {u.label}
                     </span>
-                    {item.analysis.timesBought > 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-ink/40 flex items-center gap-1 font-mono">
-                          <TrendingUp size={12} /> {item.analysis.timesBought}x comprado
+                    {item.analysis.timesBought > 0 && (() => {
+                      const itemPurchs = purchases
+                        .filter((p) => p.item_id === item.id)
+                        .sort((a, b) => new Date(a.purchased_at) - new Date(b.purchased_at))
+                      const last = itemPurchs[itemPurchs.length - 1]
+                      const store = last?.shopping_sessions?.store_name
+                      return (
+                        <span className="text-xs text-ink/40">
+                          {item.analysis.timesBought}x comprado{store ? ` · ${store}` : ''}
                         </span>
-                        {(() => {
-                          const itemPurchs = purchases
-                            .filter((p) => p.item_id === item.id)
-                            .sort((a, b) => new Date(a.purchased_at) - new Date(b.purchased_at))
-                          const last = itemPurchs[itemPurchs.length - 1]
-                          if (last?.shopping_sessions?.store_name) {
-                            return <span className="text-xs text-ink/50">· {last.shopping_sessions.store_name}</span>
-                          }
-                          return null
-                        })()}
-                      </div>
-                    )}
+                      )
+                    })()}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -455,7 +450,7 @@ export default function ShoppingList({ user }) {
                   const name = modalStoreName.trim() || (recentStores[0] || '')
                   if (name) startSession(name)
                 }}
-                className="flex-1 py-2 rounded-full bg-teal text-white text-sm"
+                className="flex-1 py-2 rounded-full bg-ink text-white text-sm"
               >
                 Iniciar
               </button>

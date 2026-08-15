@@ -169,7 +169,7 @@ export default function Bills({ user }) {
               className="w-32 rounded-full border border-line px-3 py-2 text-sm"
             />
           </div>
-          <button onClick={addBill} className="w-full bg-teal text-white rounded-full py-2 text-sm font-medium">
+          <button onClick={addBill} className="w-full bg-ink text-white rounded-full py-2 text-sm font-medium">
             Salvar conta
           </button>
         </div>
@@ -195,13 +195,11 @@ export default function Bills({ user }) {
                 <div className="min-w-0 flex-1">
                   <p className={`font-medium ${paid ? 'text-ink/40 line-through' : 'text-ink'}`}>{bill.name}</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className="text-xs text-ink/40 font-mono">{bill.category}</span>
-                    {bill.amount && (
-                      <span className="text-xs text-ink/40 font-mono">
-                        R$ {Number(bill.amount).toFixed(2)}
-                      </span>
-                    )}
-                    <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${colorMap[color]}`}>
+                    <span className="text-xs text-ink/40">
+                      {bill.category}
+                      {bill.amount ? ` · R$ ${Number(bill.amount).toFixed(2)}` : ''}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[color]}`}>
                       {paid
                         ? 'Pago'
                         : bill.left < 0

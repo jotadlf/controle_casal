@@ -214,11 +214,11 @@ export default function CarMaintenance({ user }) {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white border border-line rounded-card p-3">
-          <p className="text-xs text-ink/40 font-mono">Últimos 30 dias</p>
+          <p className="text-xs text-ink/40">Últimos 30 dias</p>
           <p className="font-display font-semibold text-lg text-ink">R$ {total30d.toFixed(2)}</p>
         </div>
         <div className="bg-white border border-line rounded-card p-3">
-          <p className="text-xs text-ink/40 font-mono">Última troca de óleo</p>
+          <p className="text-xs text-ink/40">Última troca de óleo</p>
           <p className="font-display font-semibold text-lg text-ink">
             {lastOilChange ? new Date(lastOilChange.date).toLocaleDateString('pt-BR') : '—'}
           </p>
@@ -233,7 +233,7 @@ export default function CarMaintenance({ user }) {
                 key={t.key}
                 onClick={() => setForm({ ...form, type: t.key })}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border ${
-                  form.type === t.key ? 'bg-teal text-white border-teal' : 'border-line text-ink/60'
+                  form.type === t.key ? 'bg-ink text-white border-ink' : 'border-line text-ink/60'
                 }`}
               >
                 <t.icon size={14} /> {t.label}
@@ -268,7 +268,7 @@ export default function CarMaintenance({ user }) {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             className="w-full rounded-full border border-line px-4 py-2 text-sm"
           />
-          <button onClick={addEntry} className="w-full bg-teal text-white rounded-full py-2 text-sm font-medium">
+          <button onClick={addEntry} className="w-full bg-ink text-white rounded-full py-2 text-sm font-medium">
             Salvar registro
           </button>
         </div>
@@ -296,14 +296,14 @@ export default function CarMaintenance({ user }) {
                       {t.label}
                       {entry.description ? ` — ${entry.description}` : ''}
                     </p>
-                    <p className="text-xs text-ink/40 font-mono">
+                    <p className="text-xs text-ink/40">
                       {formatLocalDate(entry.date)}
                       {entry.km ? ` · ${entry.km} km` : ''} · por {entry.created_by}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="font-mono text-sm text-ink">R$ {Number(entry.value).toFixed(2)}</span>
+                  <span className="text-sm text-ink">R$ {Number(entry.value).toFixed(2)}</span>
                   <button
                     onClick={() => removeEntry(entry.id)}
                     className="p-2 rounded-full text-ink/30 hover:bg-coral-light hover:text-coral transition-colors"

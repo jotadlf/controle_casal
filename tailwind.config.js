@@ -24,7 +24,6 @@ export default {
       fontFamily: {
         display: ['"Space Grotesk"', 'sans-serif'],
         body: ['"Inter"', 'sans-serif'],
-        mono: ['"IBM Plex Mono"', 'monospace'],
       },
       borderRadius: {
         card: '14px',

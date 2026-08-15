@@ -194,7 +194,10 @@ export default function Tasks({ user }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div />
+        <div>
+          <h2 className="font-display font-semibold text-xl text-ink">Tarefas</h2>
+          <p className="text-sm text-ink/60">Pedidos e manutenções da casa.</p>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowForm((v) => !v)}
@@ -242,8 +245,8 @@ export default function Tasks({ user }) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm text-ink truncate">{req.title}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${req.priority === 'alta' ? 'bg-coral-light text-coral border-coral/30' : 'bg-green-50 text-green-800 border-green-100'}`}>{req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${'bg-teal-light text-teal-dark border-teal/20'} ml-2`}>{'Concluído'}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${req.priority === 'alta' ? 'bg-coral-light text-coral border-coral/30' : 'bg-ink/5 text-ink/50 border-ink/10'}`}>{req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full border bg-teal-light text-teal-dark border-teal/20 ml-2">Concluído</span>
                     </div>
                     {req.description && <p className="text-xs text-ink/50 mt-0.5 line-clamp-1">{req.description}</p>}
                   </div>
@@ -277,7 +280,7 @@ export default function Tasks({ user }) {
                 className={`px-3 py-1.5 rounded-full text-xs border ${
                   form.priority === p.key
                     ? p.key === 'baixa'
-                      ? 'bg-green-50 text-green-800 border-green-100'
+                      ? 'bg-ink/5 text-ink/70 border-line'
                       : 'bg-coral-light text-coral border-coral/30'
                     : 'border-line text-ink/60'
                 }`}
@@ -314,7 +317,7 @@ export default function Tasks({ user }) {
               onChange={(e) => setForm({ ...form, due_date: e.target.value })}
               className="rounded-full border border-line px-3 py-2 text-sm"
             />
-            <button onClick={addRequest} className="flex-1 bg-teal text-white rounded-full py-2 text-sm font-medium">
+            <button onClick={addRequest} className="flex-1 bg-ink text-white rounded-full py-2 text-sm font-medium">
               Criar tarefa
             </button>
           </div>
@@ -355,7 +358,7 @@ export default function Tasks({ user }) {
             const isOpen = openId === req.id
             const priorityBadge = req.priority === 'alta'
               ? 'bg-coral-light text-coral border-coral/30'
-              : 'bg-green-50 text-green-800 border-green-100'
+              : 'bg-ink/5 text-ink/50 border-ink/10'
             const cardBg = 'bg-white border-line'
             return (
               <li key={req.id} className={`rounded-card overflow-hidden ${cardBg}`}>
@@ -363,16 +366,16 @@ export default function Tasks({ user }) {
                   <div className="min-w-0 flex-1 cursor-pointer" onClick={() => toggleOpen(req.id)}>
                     <div className="flex items-center gap-2">
                       <p className={`font-medium text-ink ${isOpen ? '' : 'text-sm truncate'}`}>{req.title}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${priorityBadge}`}> {req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${colorMap[statusInfo.color]} ml-2`}>{statusInfo.label}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${priorityBadge}`}> {req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[statusInfo.color]} ml-2`}>{statusInfo.label}</span>
                     </div>
                     {isOpen ? (
                       <>
                         {req.description && <p className="text-sm text-ink/50 mt-0.5">{req.description}</p>}
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <span className="text-xs text-ink/40 font-mono">Pedido por {req.requested_by}</span>
+                          <span className="text-xs text-ink/40">Pedido por {req.requested_by}</span>
                           {req.assigned_to && (
-                            <span className="text-xs text-ink/40 font-mono">→ {req.assigned_to}</span>
+                            <span className="text-xs text-ink/40">→ {req.assigned_to}</span>
                           )}
                         </div>
                       </>
