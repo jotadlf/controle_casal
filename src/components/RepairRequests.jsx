@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react'
-import { Plus, Trash2, Archive, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, Trash2, Check, Archive, X, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { EmptyState } from './ShoppingList'
 import { USERS } from './UserSwitch'
 
 const STATUS = [
   { key: 'pendente', label: 'Pendente', color: 'coral' },
-  { key: 'andamento', label: 'Em andamento', color: 'amber' },
   { key: 'concluido', label: 'Concluído', color: 'teal' },
 ]
 
@@ -16,6 +15,9 @@ const PRIORITY = [
 ]
 
 const CATEGORY_OPTIONS = ['Casa', 'Trabalho', 'Pessoal', 'Outro']
+
+const DRAG_THRESHOLD = 88
+const CLICK_THRESHOLD = 6
 
 export default function Tasks({ user }) {
   const [requests, setRequests] = useState([])
@@ -97,6 +99,56 @@ export default function Tasks({ user }) {
     } else {
       setOpenId(id)
     }
+  }
+
+  // arrastar card: direita = concluir, esquerda = remover, movimento mínimo = clique (abre detalhes)
+  const dragStartX = useRef(0)
+  const [drag, setDrag] = useState({ id: null, x: 0, dragging: false })
+
+  function handleDragStart(e, id) {
+    dragStartX.current = e.clientX
+    setDrag({ id, x: 0, dragging: true })
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handleDragMove(e, id) {
+    if (!drag.dragging || drag.id !== id) return
+    const dx = e.clientX - dragStartX.current
+    setDrag((d) => (d.id === id ? { ...d, x: dx } : d))
+  }
+
+  function handleDragEnd(e, id, req) {
+    if (drag.id !== id) return
+    const dx = drag.x
+
+    if (!drag.dragging) return
+
+    if (Math.abs(dx) < CLICK_THRESHOLD) {
+      setDrag({ id: null, x: 0, dragging: false })
+      const hasDetails = Boolean(req.description || req.assigned_to)
+      if (hasDetails) toggleOpen(id)
+      return
+    }
+
+    if (dx > DRAG_THRESHOLD) {
+      setDrag({ id, x: 600, dragging: false })
+      setTimeout(() => {
+        updateStatus(req, 'concluido')
+        setDrag({ id: null, x: 0, dragging: false })
+      }, 180)
+      return
+    }
+
+    if (dx < -DRAG_THRESHOLD) {
+      setDrag({ id, x: -600, dragging: false })
+      setTimeout(() => {
+        removeRequest(req.id)
+        setDrag({ id: null, x: 0, dragging: false })
+      }, 180)
+      return
+    }
+
+    setDrag({ id: null, x: 0, dragging: false })
   }
 
   async function addRequest() {
@@ -196,7 +248,7 @@ export default function Tasks({ user }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display font-semibold text-xl text-ink">Tarefas</h2>
-          <p className="text-sm text-ink/60">Pedidos e manutenções da casa.</p>
+          <p className="text-sm text-ink/60">Arraste um card para a direita pra concluir, para a esquerda pra remover.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -240,16 +292,20 @@ export default function Tasks({ user }) {
         <div className="mt-3">
           <ul className="mt-2 space-y-2">
             {[...completedRequests].sort(sortByPriorityThenId).map((req) => (
-              <li key={`c-${req.id}`} className="rounded-card overflow-hidden bg-white border-line">
+              <li key={`c-${req.id}`} className="rounded-card overflow-hidden bg-white border border-line">
                 <div className="flex items-center justify-between gap-3 px-4 py-2">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-ink truncate">{req.title}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${req.priority === 'alta' ? 'bg-coral-light text-coral border-coral/30' : 'bg-ink/5 text-ink/50 border-ink/10'}`}>{req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full border bg-teal-light text-teal-dark border-teal/20 ml-2">Concluído</span>
+                    <div className="flex items-center gap-1.5">
+                      {req.priority === 'alta' && (
+                        <AlertCircle size={14} className="text-coral shrink-0" aria-label="Prioridade alta" />
+                      )}
+                      <p className="text-sm text-ink/50 truncate line-through">{req.title}</p>
                     </div>
-                    {req.description && <p className="text-xs text-ink/50 mt-0.5 line-clamp-1">{req.description}</p>}
+                    {req.description && <p className="text-xs text-ink/40 mt-0.5 line-clamp-1">{req.description}</p>}
                   </div>
+                </div>
+                <div className="px-4 pb-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-teal" title="Concluído" />
                 </div>
               </li>
             ))}
@@ -349,29 +405,46 @@ export default function Tasks({ user }) {
       ) : (
         <ul className="space-y-2">
           {[...filtered].sort(sortByPriorityThenId).map((req) => {
-            const statusInfo = STATUS.find((s) => s.key === req.status)
-            const colorMap = {
-              coral: 'bg-coral-light text-coral border-coral/30',
-              amber: 'bg-amber-light text-amber border-amber/40',
-              teal: 'bg-teal-light text-teal-dark border-teal/20',
-            }
             const isOpen = openId === req.id
-            const priorityBadge = req.priority === 'alta'
-              ? 'bg-coral-light text-coral border-coral/30'
-              : 'bg-ink/5 text-ink/50 border-ink/10'
-            const cardBg = 'bg-white border-line'
+            const isDone = req.status === 'concluido'
+            const hasDetails = Boolean(req.description || req.assigned_to)
+            const isDragging = drag.id === req.id
+            const dragX = isDragging ? drag.x : 0
             return (
-              <li key={req.id} className={`rounded-card overflow-hidden ${cardBg}`}>
-                <div className={`flex items-start justify-between gap-3 px-4 ${isOpen ? 'py-3' : 'py-2'}`}>
-                  <div className="min-w-0 flex-1 cursor-pointer" onClick={() => toggleOpen(req.id)}>
-                    <div className="flex items-center gap-2">
-                      <p className={`font-medium text-ink ${isOpen ? '' : 'text-sm truncate'}`}>{req.title}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${priorityBadge}`}> {req.priority === 'alta' ? 'Alta' : 'Baixa'}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[statusInfo.color]} ml-2`}>{statusInfo.label}</span>
+              <li key={req.id} className="relative rounded-card overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-between px-5">
+                  <span className={`flex items-center gap-1.5 text-coral text-xs font-medium transition-opacity ${dragX < -12 ? 'opacity-100' : 'opacity-0'}`}>
+                    <Trash2 size={16} /> Remover
+                  </span>
+                  <span className={`flex items-center gap-1.5 text-teal-dark text-xs font-medium ml-auto transition-opacity ${dragX > 12 ? 'opacity-100' : 'opacity-0'}`}>
+                    Concluir <Check size={16} />
+                  </span>
+                </div>
+
+                <div
+                  className={`relative bg-white border border-line rounded-card ${hasDetails ? 'cursor-pointer' : ''}`}
+                  style={{
+                    transform: `translateX(${dragX}px)`,
+                    transition: isDragging && drag.dragging ? 'none' : 'transform 0.2s ease',
+                    touchAction: 'pan-y',
+                  }}
+                  onPointerDown={(e) => handleDragStart(e, req.id)}
+                  onPointerMove={(e) => handleDragMove(e, req.id)}
+                  onPointerUp={(e) => handleDragEnd(e, req.id, req)}
+                  onPointerCancel={() => setDrag({ id: null, x: 0, dragging: false })}
+                >
+                  <div className={`px-4 ${isOpen ? 'py-3' : 'py-2'}`}>
+                    <div className="flex items-center gap-1.5">
+                      {req.priority === 'alta' && (
+                        <AlertCircle size={14} className="text-coral shrink-0" aria-label="Prioridade alta" />
+                      )}
+                      <p className={`font-medium text-ink ${isOpen ? '' : 'text-sm truncate'} ${isDone ? 'line-through text-ink/40' : ''}`}>
+                        {req.title}
+                      </p>
                     </div>
                     {isOpen ? (
                       <>
-                        {req.description && <p className="text-sm text-ink/50 mt-0.5">{req.description}</p>}
+                        {req.description && <p className="text-sm text-ink/50 mt-1">{req.description}</p>}
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <span className="text-xs text-ink/40">Pedido por {req.requested_by}</span>
                           {req.assigned_to && (
@@ -381,26 +454,13 @@ export default function Tasks({ user }) {
                       </>
                     ) : null}
                   </div>
-                  <button
-                    onClick={() => removeRequest(req.id)}
-                    className="p-2 rounded-full text-ink/30 hover:bg-coral-light hover:text-coral transition-colors shrink-0"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
 
-                <div className="flex gap-2 px-4 pb-3">
-                  {isOpen && STATUS.map((s) => (
-                    <button
-                      key={s.key}
-                      onClick={() => updateStatus(req, s.key)}
-                      className={`text-xs px-2.5 py-1 rounded-full border ${
-                        req.status === s.key ? 'bg-ink text-white border-ink' : 'border-line text-ink/50'
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
+                  <div className="px-4 pb-2.5">
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full ${isDone ? 'bg-teal' : 'bg-coral'}`}
+                      title={isDone ? 'Concluído' : 'Pendente'}
+                    />
+                  </div>
                 </div>
               </li>
             )
