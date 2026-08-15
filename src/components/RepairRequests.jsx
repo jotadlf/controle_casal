@@ -408,13 +408,13 @@ export default function Tasks({ user }) {
             return (
               <li key={req.id} className="relative rounded-card overflow-hidden">
                 <div className="absolute inset-0 flex items-center justify-between px-5">
-                  <Trash2
-                    size={18}
-                    className={`text-coral transition-all ${isActiveDrag ? 'opacity-100' : 'opacity-0'} ${dragX < -DRAG_THRESHOLD ? 'scale-125' : 'scale-100'}`}
-                  />
                   <Check
                     size={18}
-                    className={`text-teal-dark transition-all ${isActiveDrag ? 'opacity-100' : 'opacity-0'} ${dragX > DRAG_THRESHOLD ? 'scale-125' : 'scale-100'}`}
+                    className={`text-teal-dark transition-all ${isActiveDrag && dragX > 0 ? 'opacity-100' : 'opacity-0'} ${dragX > DRAG_THRESHOLD ? 'scale-125' : 'scale-100'}`}
+                  />
+                  <Trash2
+                    size={18}
+                    className={`text-coral transition-all ${isActiveDrag && dragX < 0 ? 'opacity-100' : 'opacity-0'} ${dragX < -DRAG_THRESHOLD ? 'scale-125' : 'scale-100'}`}
                   />
                 </div>
 
