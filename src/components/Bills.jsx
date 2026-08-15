@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { nextDueDate, daysUntil, currentReferenceMonth, urgencyColor } from '../lib/bills'
 import { EmptyState } from './ShoppingList'
 import Modal from './Modal'
+import FabButton from './FabButton'
 
 const CATEGORIES = ['Aluguel', 'Água', 'Luz', 'Internet', 'Gás', 'Outro']
 const DRAG_THRESHOLD = 88
@@ -169,22 +170,16 @@ export default function Bills({ user }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display font-semibold text-xl text-ink">Contas recorrentes</h2>
-          <p className="text-sm text-ink/60">Vencimentos do mês atual.</p>
-          <p className="text-sm text-teal font-semibold">Gasto total do mês: {formatCurrency(totalSpentThisMonth)}</p>
-          <p className="text-xs text-ink/40 mt-0.5">Arraste uma conta para a direita pra marcar como paga, para a esquerda pra remover.</p>
-        </div>
-        <button
-          onClick={() => { setFormError(''); setShowForm(true) }}
-          aria-label="Nova conta"
-          title="Nova conta"
-          className="flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full text-sm font-medium"
-        >
-          <Plus size={16} />
-        </button>
+      <div>
+        <h2 className="font-display font-semibold text-xl text-ink">Contas recorrentes</h2>
+        <p className="text-sm text-ink/60">Vencimentos do mês atual.</p>
+        <p className="text-sm text-teal font-semibold">Gasto total do mês: {formatCurrency(totalSpentThisMonth)}</p>
+        <p className="text-xs text-ink/40 mt-0.5">Arraste uma conta para a direita pra marcar como paga, para a esquerda pra remover.</p>
       </div>
+
+      <FabButton onClick={() => { setFormError(''); setShowForm(true) }} label="Nova conta">
+        <Plus size={16} />
+      </FabButton>
 
       {showForm && (
         <Modal

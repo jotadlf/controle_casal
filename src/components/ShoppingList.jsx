@@ -24,6 +24,12 @@ export default function ShoppingList({ user }) {
   const [alert, setAlert] = useState(null)
   const inputContainerRef = useRef(null)
 
+  useEffect(() => {
+    if (!alert) return
+    const timer = setTimeout(() => setAlert(null), 3500)
+    return () => clearTimeout(timer)
+  }, [alert])
+
   async function loadAll() {
     setLoading(true)
     // buscar items, purchases (incluindo sessão) e sugestões de lojas

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { EmptyState } from './ShoppingList'
 import { USERS } from './UserSwitch'
 import Modal from './Modal'
+import FabButton from './FabButton'
 
 const STATUS = [
   { key: 'pendente', label: 'Pendente', color: 'coral' },
@@ -33,6 +34,12 @@ export default function Tasks({ user }) {
   const [filter, setFilter] = useState('todos')
   const [alert, setAlert] = useState(null)
   const [showCompletedPanel, setShowCompletedPanel] = useState(false)
+
+  useEffect(() => {
+    if (!alert) return
+    const timer = setTimeout(() => setAlert(null), 3500)
+    return () => clearTimeout(timer)
+  }, [alert])
 
   async function loadAll() {
     setLoading(true)
@@ -249,25 +256,19 @@ export default function Tasks({ user }) {
           <h2 className="font-display font-semibold text-xl text-ink">Tarefas</h2>
           <p className="text-sm text-ink/60">Arraste um card para a direita pra concluir, para a esquerda pra remover.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setFormError(''); setShowForm(true) }}
-            aria-label="Nova tarefa"
-            title="Nova tarefa"
-            className="flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full text-sm font-medium"
-          >
-            <Plus size={16} />
-          </button>
-          <button
-            onClick={() => setShowCompletedPanel((v) => !v)}
-            aria-label="Arquivados"
-            title="Arquivados"
-            className="flex items-center justify-center bg-ink/5 text-ink w-10 h-10 rounded-full text-sm font-medium border border-line"
-          >
-            <Archive size={16} />
-          </button>
-        </div>
+        <button
+          onClick={() => setShowCompletedPanel((v) => !v)}
+          aria-label="Arquivados"
+          title="Arquivados"
+          className="flex items-center justify-center bg-ink/5 text-ink w-10 h-10 rounded-full text-sm font-medium border border-line shrink-0"
+        >
+          <Archive size={16} />
+        </button>
       </div>
+
+      <FabButton onClick={() => { setFormError(''); setShowForm(true) }} label="Nova tarefa">
+        <Plus size={16} />
+      </FabButton>
       {alert && (
         <div className={`rounded-card border px-4 py-3 text-sm flex items-start justify-between gap-3 ${
           alert.type === 'error'

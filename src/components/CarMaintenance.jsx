@@ -3,6 +3,7 @@ import { Plus, Trash2, Fuel, Wrench, Droplet, MapPin, HelpCircle } from 'lucide-
 import { supabase } from '../lib/supabaseClient'
 import { EmptyState } from './ShoppingList'
 import Modal from './Modal'
+import FabButton from './FabButton'
 
 const TYPES = [
   { key: 'combustivel', label: 'Combustível', icon: Fuel },
@@ -243,21 +244,15 @@ export default function CarMaintenance({ user }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display font-semibold text-xl text-ink">Carro</h2>
-          <p className="text-sm text-ink/60">Combustível, oficina, óleo e viagens.</p>
-          <p className="text-xs text-ink/40 mt-0.5">Arraste um registro para a esquerda pra remover.</p>
-        </div>
-        <button
-          onClick={() => { setFormError(''); setShowForm(true) }}
-          aria-label="Registrar"
-          title="Registrar"
-          className="flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full text-sm font-medium"
-        >
-          <Plus size={16} />
-        </button>
+      <div>
+        <h2 className="font-display font-semibold text-xl text-ink">Carro</h2>
+        <p className="text-sm text-ink/60">Combustível, oficina, óleo e viagens.</p>
+        <p className="text-xs text-ink/40 mt-0.5">Arraste um registro para a esquerda pra remover.</p>
       </div>
+
+      <FabButton onClick={() => { setFormError(''); setShowForm(true) }} label="Registrar">
+        <Plus size={16} />
+      </FabButton>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white border border-line rounded-card p-3">
