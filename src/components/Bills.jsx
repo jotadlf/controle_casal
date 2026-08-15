@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, CheckCircle2, Circle } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Plus, Trash2, Check, CheckCircle2, Circle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { nextDueDate, daysUntil, currentReferenceMonth, urgencyColor } from '../lib/bills'
 import { EmptyState } from './ShoppingList'
+import Modal from './Modal'
 
 const CATEGORIES = ['Aluguel', 'Água', 'Luz', 'Internet', 'Gás', 'Outro']
+const DRAG_THRESHOLD = 88
 
 export default function Bills({ user }) {
   const [bills, setBills] = useState([])
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ name: '', category: 'Outro', amount: '', due_day: '' })
+  const [formError, setFormError] = useState('')
   const [showForm, setShowForm] = useState(false)
 
   const totalSpentThisMonth = useMemo(() => {
@@ -58,7 +61,10 @@ export default function Bills({ user }) {
   }, [bills, payments])
 
   async function addBill() {
-    if (!form.name.trim() || !form.due_day) return
+    if (!form.name.trim() || !form.due_day) {
+      setFormError('Informe o nome e o dia de vencimento.')
+      return
+    }
     const { data, error } = await supabase
       .from('bills')
       .insert({
@@ -70,9 +76,14 @@ export default function Bills({ user }) {
       })
       .select()
       .single()
-    if (!error && data) {
+    if (error) {
+      setFormError(`Falha ao salvar conta: ${error.message}`)
+      return
+    }
+    if (data) {
       setBills((prev) => [...prev, data])
       setForm({ name: '', category: 'Outro', amount: '', due_day: '' })
+      setFormError('')
       setShowForm(false)
     }
   }
@@ -80,6 +91,46 @@ export default function Bills({ user }) {
   async function removeBill(id) {
     await supabase.from('bills').update({ active: false }).eq('id', id)
     setBills((prev) => prev.filter((b) => b.id !== id))
+  }
+
+  // arrastar card: direita = marcar pago/reabrir, esquerda = remover
+  const dragStartX = useRef(0)
+  const [drag, setDrag] = useState({ id: null, x: 0, dragging: false })
+
+  function handleDragStart(e, id) {
+    dragStartX.current = e.clientX
+    setDrag({ id, x: 0, dragging: true })
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handleDragMove(e, id) {
+    if (!drag.dragging || drag.id !== id) return
+    const dx = e.clientX - dragStartX.current
+    setDrag((d) => (d.id === id ? { ...d, x: dx } : d))
+  }
+
+  function handleDragEnd(e, id, bill) {
+    if (drag.id !== id) return
+    const dx = drag.x
+
+    if (!drag.dragging) return
+
+    if (dx > DRAG_THRESHOLD) {
+      setDrag({ id: null, x: 0, dragging: false })
+      togglePaid(bill)
+      return
+    }
+
+    if (dx < -DRAG_THRESHOLD) {
+      setDrag({ id, x: -600, dragging: false })
+      setTimeout(() => {
+        removeBill(bill.id)
+        setDrag({ id: null, x: 0, dragging: false })
+      }, 180)
+      return
+    }
+
+    setDrag({ id: null, x: 0, dragging: false })
   }
 
   async function togglePaid(bill) {
@@ -123,9 +174,10 @@ export default function Bills({ user }) {
           <h2 className="font-display font-semibold text-xl text-ink">Contas recorrentes</h2>
           <p className="text-sm text-ink/60">Vencimentos do mês atual.</p>
           <p className="text-sm text-teal font-semibold">Gasto total do mês: {formatCurrency(totalSpentThisMonth)}</p>
+          <p className="text-xs text-ink/40 mt-0.5">Arraste uma conta para a direita pra marcar como paga, para a esquerda pra remover.</p>
         </div>
         <button
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => { setFormError(''); setShowForm(true) }}
           aria-label="Nova conta"
           title="Nova conta"
           className="flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full text-sm font-medium"
@@ -135,44 +187,66 @@ export default function Bills({ user }) {
       </div>
 
       {showForm && (
-        <div className="bg-white border border-line rounded-card p-4 space-y-3">
-          <input
-            placeholder="Nome (ex: Aluguel)"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full rounded-full border border-line px-4 py-2 text-sm"
-          />
-          <div className="flex gap-2">
+        <Modal
+          title="Nova conta"
+          onClose={() => { setShowForm(false); setFormError('') }}
+          footer={
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowForm(false); setFormError('') }}
+                className="flex-1 py-2 rounded-full border border-line text-sm"
+              >
+                Cancelar
+              </button>
+              <button onClick={addBill} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+                Salvar conta
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <input
+              placeholder="Nome (ex: Aluguel)"
+              value={form.name}
+              onChange={(e) => {
+                setForm({ ...form, name: e.target.value })
+                if (formError) setFormError('')
+              }}
+              className={`w-full rounded-full border px-4 py-2 text-sm ${formError ? 'border-coral' : 'border-line'}`}
+            />
             <select
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="flex-1 rounded-full border border-line px-3 py-2 text-sm bg-white"
+              className="w-full rounded-full border border-line px-4 py-2 text-sm bg-white"
             >
               {CATEGORIES.map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
-            <input
-              type="number"
-              placeholder="Dia venc."
-              min="1"
-              max="31"
-              value={form.due_day}
-              onChange={(e) => setForm({ ...form, due_day: e.target.value })}
-              className="w-28 rounded-full border border-line px-3 py-2 text-sm"
-            />
-            <input
-              type="number"
-              placeholder="Valor (opc.)"
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              className="w-32 rounded-full border border-line px-3 py-2 text-sm"
-            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                placeholder="Dia venc."
+                min="1"
+                max="31"
+                value={form.due_day}
+                onChange={(e) => {
+                  setForm({ ...form, due_day: e.target.value })
+                  if (formError) setFormError('')
+                }}
+                className={`flex-1 rounded-full border px-3 py-2 text-sm ${formError ? 'border-coral' : 'border-line'}`}
+              />
+              <input
+                type="number"
+                placeholder="Valor (opc.)"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                className="flex-1 rounded-full border border-line px-3 py-2 text-sm"
+              />
+            </div>
+            {formError && <p className="text-xs text-coral px-1">{formError}</p>}
           </div>
-          <button onClick={addBill} className="w-full bg-ink text-white rounded-full py-2 text-sm font-medium">
-            Salvar conta
-          </button>
-        </div>
+        </Modal>
       )}
 
       {loading ? (
@@ -184,38 +258,56 @@ export default function Bills({ user }) {
           {rows.map((bill) => {
             const paid = !!bill.payment?.paid
             const color = urgencyColor(bill.left, paid)
+            const isDragging = drag.id === bill.id
+            const isActiveDrag = isDragging && drag.dragging
+            const dragX = isDragging ? drag.x : 0
             return (
-              <li
-                key={bill.id}
-                className="flex items-center justify-between gap-3 bg-white rounded-card border border-line px-4 py-3"
-              >
-                <button onClick={() => togglePaid(bill)} className="shrink-0 text-teal">
-                  {paid ? <CheckCircle2 size={22} /> : <Circle size={22} className="text-ink/20" />}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <p className={`font-medium ${paid ? 'text-ink/40 line-through' : 'text-ink'}`}>{bill.name}</p>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className="text-xs text-ink/40">
-                      {bill.category}
-                      {bill.amount ? ` · R$ ${Number(bill.amount).toFixed(2)}` : ''}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[color]}`}>
-                      {paid
-                        ? 'Pago'
-                        : bill.left < 0
-                        ? `Venceu há ${Math.abs(bill.left)}d`
-                        : bill.left === 0
-                        ? 'Vence hoje'
-                        : `Vence em ${bill.left}d`}
-                    </span>
+              <li key={bill.id} className="relative rounded-card overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-between px-5">
+                  <Check
+                    size={18}
+                    className={`text-teal-dark transition-all ${isActiveDrag && dragX > 0 ? 'opacity-100' : 'opacity-0'} ${dragX > DRAG_THRESHOLD ? 'scale-125' : 'scale-100'}`}
+                  />
+                  <Trash2
+                    size={18}
+                    className={`text-coral transition-all ${isActiveDrag && dragX < 0 ? 'opacity-100' : 'opacity-0'} ${dragX < -DRAG_THRESHOLD ? 'scale-125' : 'scale-100'}`}
+                  />
+                </div>
+
+                <div
+                  className="relative flex items-center gap-3 bg-white rounded-card border border-line px-4 py-3"
+                  style={{
+                    transform: `translateX(${dragX}px)`,
+                    transition: isActiveDrag ? 'none' : 'transform 0.2s ease',
+                    touchAction: 'pan-y',
+                  }}
+                  onPointerDown={(e) => handleDragStart(e, bill.id)}
+                  onPointerMove={(e) => handleDragMove(e, bill.id)}
+                  onPointerUp={(e) => handleDragEnd(e, bill.id, bill)}
+                  onPointerCancel={() => setDrag({ id: null, x: 0, dragging: false })}
+                >
+                  <span className="shrink-0 text-teal">
+                    {paid ? <CheckCircle2 size={22} /> : <Circle size={22} className="text-ink/20" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`font-medium ${paid ? 'text-ink/40 line-through' : 'text-ink'}`}>{bill.name}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-xs text-ink/40">
+                        {bill.category}
+                        {bill.amount ? ` · R$ ${Number(bill.amount).toFixed(2)}` : ''}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[color]}`}>
+                        {paid
+                          ? 'Pago'
+                          : bill.left < 0
+                          ? `Venceu há ${Math.abs(bill.left)}d`
+                          : bill.left === 0
+                          ? 'Vence hoje'
+                          : `Vence em ${bill.left}d`}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => removeBill(bill.id)}
-                  className="p-2 rounded-full text-ink/30 hover:bg-coral-light hover:text-coral transition-colors shrink-0"
-                >
-                  <Trash2 size={16} />
-                </button>
               </li>
             )
           })}
