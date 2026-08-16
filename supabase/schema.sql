@@ -30,3 +30,8 @@ create table if not exists calendar_events (
 );
 
 create index if not exists calendar_events_event_date_idx on calendar_events (event_date);
+
+-- Horário de término (opcional): quando preenchido, o compromisso "cobre"
+-- o intervalo entre event_time e event_end_time na agenda do dia.
+alter table calendar_events
+  add column if not exists event_end_time time;

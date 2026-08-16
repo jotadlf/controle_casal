@@ -43,7 +43,7 @@ export default function CalendarView({ user }) {
   const [selectedDate, setSelectedDate] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [formError, setFormError] = useState('')
-  const [form, setForm] = useState({ title: '', description: '', date: '', time: '' })
+  const [form, setForm] = useState({ title: '', description: '', date: '', time: '', endTime: '' })
   const [activeEventId, setActiveEventId] = useState(null)
   const [now, setNow] = useState(() => new Date())
   const timelineRef = useRef(null)
@@ -120,7 +120,7 @@ export default function CalendarView({ user }) {
 
   function openNewEventForm() {
     setFormError('')
-    setForm({ title: '', description: '', date: selectedDate || todayKey, time: '' })
+    setForm({ title: '', description: '', date: selectedDate || todayKey, time: '', endTime: '' })
     setShowForm(true)
   }
 
@@ -133,6 +133,10 @@ export default function CalendarView({ user }) {
       setFormError('Informe a data.')
       return
     }
+    if (form.endTime && (!form.time || form.endTime <= form.time)) {
+      setFormError('A hora de término deve ser depois do início.')
+      return
+    }
     const { data, error } = await supabase
       .from('calendar_events')
       .insert({
@@ -140,6 +144,7 @@ export default function CalendarView({ user }) {
         description: form.description.trim() || null,
         event_date: form.date,
         event_time: form.time || null,
+        event_end_time: form.time ? form.endTime || null : null,
         created_by: user,
       })
       .select()
@@ -286,34 +291,62 @@ export default function CalendarView({ user }) {
                 ))}
 
                 {dayEvents.map((ev) => {
-                  const t = parseTime(ev.event_time)
-                  const top = t ? ((t.hours * 60 + t.minutes) / (24 * 60)) * (HOUR_HEIGHT * 24) : null
-                  if (top === null) return null
+                  const start = parseTime(ev.event_time)
+                  if (!start) return null
+                  const startMinutes = start.hours * 60 + start.minutes
+                  const top = (startMinutes / (24 * 60)) * (HOUR_HEIGHT * 24)
+
+                  const end = parseTime(ev.event_end_time)
+                  const endMinutes = end ? end.hours * 60 + end.minutes : null
+                  const hasRange = endMinutes !== null && endMinutes > startMinutes
+                  const bottom = hasRange ? (endMinutes / (24 * 60)) * (HOUR_HEIGHT * 24) : null
+                  const height = hasRange ? Math.max(bottom - top, 26) : null
+
                   const isActive = activeEventId === ev.id
-                  const isPast = isViewingToday && top < nowTop
+                  const isPast = isViewingToday && (hasRange ? bottom : top) < nowTop
+                  const timeLabel = hasRange
+                    ? `${ev.event_time.slice(0, 5)}–${ev.event_end_time.slice(0, 5)}`
+                    : ev.event_time.slice(0, 5)
+
                   return (
                     <div
                       key={ev.id}
-                      className={`absolute left-14 right-0 transition-opacity duration-300 ${isPast ? 'opacity-40' : ''}`}
-                      style={{ top }}
+                      className={`absolute left-14 right-2 transition-opacity duration-300 ${isPast ? 'opacity-40' : ''}`}
+                      style={{ top, height: hasRange ? height : undefined }}
                     >
-                      <div className="relative">
-                        <div className="absolute left-0 right-0 h-px bg-ink/25" style={{ top: 0 }} />
-                        <button
-                          onClick={() => setActiveEventId(isActive ? null : ev.id)}
-                          className="absolute left-2 -top-2.5 max-w-[85%] text-left"
-                        >
-                          <span className="inline-block bg-white px-1.5 py-0.5 rounded text-xs font-medium text-ink border border-line truncate">
-                            {ev.event_time?.slice(0, 5)} · {ev.title}
-                          </span>
-                        </button>
+                      <div className="relative h-full">
+                        {hasRange ? (
+                          <button
+                            onClick={() => setActiveEventId(isActive ? null : ev.id)}
+                            className="absolute inset-0 rounded-md bg-sky-200 border border-sky-400 px-2 py-1 text-left overflow-hidden"
+                          >
+                            <p className="text-xs font-medium text-sky-900 truncate">{ev.title}</p>
+                            <p className="text-[10px] text-sky-700">{timeLabel}</p>
+                          </button>
+                        ) : (
+                          <>
+                            <div className="absolute left-0 right-0 h-px bg-ink/25" style={{ top: 0 }} />
+                            <button
+                              onClick={() => setActiveEventId(isActive ? null : ev.id)}
+                              className="absolute left-2 -top-2.5 max-w-[85%] text-left"
+                            >
+                              <span className="inline-block bg-white px-1.5 py-0.5 rounded text-xs font-medium text-ink border border-line truncate">
+                                {timeLabel} · {ev.title}
+                              </span>
+                            </button>
+                          </>
+                        )}
                         {isActive && (
-                          <div className="absolute left-2 top-4 z-10 bg-white border border-line rounded-card shadow-lg p-3 w-64 max-w-[80vw] animate-pop-in">
+                          <div
+                            className={`absolute left-2 z-10 bg-white border border-line rounded-card shadow-lg p-3 w-64 max-w-[80vw] animate-pop-in ${
+                              hasRange ? 'top-full mt-1' : 'top-4'
+                            }`}
+                          >
                             <p className="font-medium text-ink text-sm">{ev.title}</p>
                             {ev.description && <p className="text-xs text-ink/50 mt-1">{ev.description}</p>}
                             <div className="flex items-center justify-between mt-2">
                               <span className="text-xs text-ink/40">
-                                {ev.event_time?.slice(0, 5)}
+                                {timeLabel}
                                 {ev.created_by ? ` · por ${ev.created_by}` : ''}
                               </span>
                               <button
@@ -379,20 +412,39 @@ export default function CalendarView({ user }) {
                 className={`w-full rounded-full border px-4 py-2 text-sm ${formError ? 'border-coral' : 'border-line'}`}
               />
             </div>
-            <div className="flex gap-2">
-              <input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="flex-1 rounded-full border border-line px-3 py-2 text-sm"
-              />
+            <input
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+              className="w-full rounded-full border border-line px-3 py-2 text-sm"
+            />
+            <div className="flex items-center gap-2">
               <input
                 type="time"
                 value={form.time}
-                onChange={(e) => setForm({ ...form, time: e.target.value })}
-                className="w-32 rounded-full border border-line px-3 py-2 text-sm"
+                onChange={(e) => {
+                  setForm({ ...form, time: e.target.value })
+                  if (formError) setFormError('')
+                }}
+                className="flex-1 rounded-full border border-line px-3 py-2 text-sm"
+              />
+              <span className="text-xs text-ink/40 shrink-0">até</span>
+              <input
+                type="time"
+                value={form.endTime}
+                onChange={(e) => {
+                  setForm({ ...form, endTime: e.target.value })
+                  if (formError) setFormError('')
+                }}
+                disabled={!form.time}
+                className="flex-1 rounded-full border border-line px-3 py-2 text-sm disabled:opacity-40"
               />
             </div>
+            {form.endTime && (
+              <p className="text-xs text-ink/40 px-1">
+                Compromisso vai ocupar o intervalo de {form.time} até {form.endTime} na agenda do dia.
+              </p>
+            )}
             <textarea
               placeholder="Detalhes (opcional)"
               value={form.description}
