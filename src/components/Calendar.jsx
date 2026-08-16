@@ -45,7 +45,13 @@ export default function CalendarView({ user }) {
   const [formError, setFormError] = useState('')
   const [form, setForm] = useState({ title: '', description: '', date: '', time: '' })
   const [activeEventId, setActiveEventId] = useState(null)
+  const [now, setNow] = useState(() => new Date())
   const timelineRef = useRef(null)
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(id)
+  }, [])
 
   async function loadEvents() {
     setLoading(true)
@@ -71,8 +77,9 @@ export default function CalendarView({ user }) {
     loadEvents()
   }, [monthDate, user])
 
-  const today = new Date()
-  const todayKey = toDateKey(today.getFullYear(), today.getMonth(), today.getDate())
+  const todayKey = toDateKey(now.getFullYear(), now.getMonth(), now.getDate())
+  const isViewingToday = selectedDate === todayKey
+  const nowTop = ((now.getHours() * 60 + now.getMinutes()) / (24 * 60)) * (HOUR_HEIGHT * 24)
 
   const eventsByDate = useMemo(() => {
     const map = {}
@@ -105,7 +112,8 @@ export default function CalendarView({ user }) {
     if (!selectedDate || !timelineRef.current) return
     const first = dayEvents.find((e) => e.event_time)
     const t = first ? parseTime(first.event_time) : null
-    const targetHour = t ? Math.max(t.hours - 2, 0) : 7
+    const fallbackHour = isViewingToday ? now.getHours() : 7
+    const targetHour = t ? Math.max(t.hours - 2, 0) : Math.max(fallbackHour - 2, 0)
     timelineRef.current.scrollTop = targetHour * HOUR_HEIGHT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate])
@@ -282,15 +290,20 @@ export default function CalendarView({ user }) {
                   const top = t ? ((t.hours * 60 + t.minutes) / (24 * 60)) * (HOUR_HEIGHT * 24) : null
                   if (top === null) return null
                   const isActive = activeEventId === ev.id
+                  const isPast = isViewingToday && top < nowTop
                   return (
-                    <div key={ev.id} className="absolute left-14 right-0" style={{ top }}>
+                    <div
+                      key={ev.id}
+                      className={`absolute left-14 right-0 transition-opacity duration-300 ${isPast ? 'opacity-40' : ''}`}
+                      style={{ top }}
+                    >
                       <div className="relative">
-                        <div className="absolute left-0 right-0 h-px bg-red-500" style={{ top: 0 }} />
+                        <div className="absolute left-0 right-0 h-px bg-ink/25" style={{ top: 0 }} />
                         <button
                           onClick={() => setActiveEventId(isActive ? null : ev.id)}
                           className="absolute left-2 -top-2.5 max-w-[85%] text-left"
                         >
-                          <span className="inline-block bg-white px-1.5 py-0.5 rounded text-xs font-medium text-ink border border-red-500/30 truncate">
+                          <span className="inline-block bg-white px-1.5 py-0.5 rounded text-xs font-medium text-ink border border-line truncate">
                             {ev.event_time?.slice(0, 5)} · {ev.title}
                           </span>
                         </button>
@@ -317,6 +330,13 @@ export default function CalendarView({ user }) {
                     </div>
                   )
                 })}
+
+                {isViewingToday && (
+                  <div className="absolute left-14 right-0 z-10 pointer-events-none" style={{ top: nowTop }}>
+                    <span className="absolute left-0 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-red-500" />
+                    <div className="h-px bg-red-500" />
+                  </div>
+                )}
               </div>
             </div>
           </div>
