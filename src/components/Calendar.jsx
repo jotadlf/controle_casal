@@ -168,7 +168,7 @@ export default function CalendarView({ user }) {
     : ''
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div>
         <h2 className="font-display font-semibold text-xl text-ink">Calendário</h2>
         <p className="text-sm text-ink/60">Toque em um dia para ver os compromissos.</p>
@@ -178,28 +178,28 @@ export default function CalendarView({ user }) {
         <Plus size={16} />
       </FabButton>
 
-      <div className="bg-white border border-line rounded-card p-4">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white border border-line rounded-card p-3">
+        <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => changeMonth(-1)}
             aria-label="Mês anterior"
-            className="p-2 rounded-full text-ink/50 hover:bg-ink/5"
+            className="p-1.5 rounded-full text-ink/50 hover:bg-ink/5"
           >
-            <ChevronLeft size={18} />
+            <ChevronLeft size={16} />
           </button>
-          <h3 className="font-display font-semibold text-lg text-ink">{monthLabel(monthDate)}</h3>
+          <h3 className="font-display font-semibold text-base text-ink">{monthLabel(monthDate)}</h3>
           <button
             onClick={() => changeMonth(1)}
             aria-label="Próximo mês"
-            className="p-2 rounded-full text-ink/50 hover:bg-ink/5"
+            className="p-1.5 rounded-full text-ink/50 hover:bg-ink/5"
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={16} />
           </button>
         </div>
 
-        <div className="grid grid-cols-7 gap-y-2 text-center">
+        <div className="grid grid-cols-7 gap-y-0.5 text-center">
           {WEEKDAYS.map((w, i) => (
-            <span key={i} className="text-xs text-ink/40">
+            <span key={i} className="text-[10px] text-ink/40 pb-1">
               {w}
             </span>
           ))}
@@ -214,10 +214,10 @@ export default function CalendarView({ user }) {
               <button
                 key={i}
                 onClick={() => openDate(dateKey)}
-                className="flex flex-col items-center gap-1 py-1"
+                className="flex flex-col items-center gap-0.5 py-0.5"
               >
                 <span
-                  className={`w-8 h-8 flex items-center justify-center rounded-full text-sm transition-colors ${
+                  className={`w-7 h-7 flex items-center justify-center rounded-full text-xs transition-colors ${
                     isToday
                       ? 'bg-ink text-white font-medium'
                       : isSelected
@@ -233,7 +233,7 @@ export default function CalendarView({ user }) {
           })}
         </div>
 
-        {loading && <p className="text-xs text-ink/40 mt-3">Carregando...</p>}
+        {loading && <p className="text-xs text-ink/40 mt-2">Carregando...</p>}
       </div>
 
       {selectedDate && (
