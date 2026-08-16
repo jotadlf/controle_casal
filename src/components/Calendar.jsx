@@ -52,6 +52,7 @@ export default function CalendarView({ user }) {
     const { data, error } = await supabase
       .from('calendar_events')
       .select('*')
+      .eq('created_by', user)
       .gte('event_date', start)
       .lte('event_date', end)
       .order('event_time', { ascending: true })
@@ -67,7 +68,7 @@ export default function CalendarView({ user }) {
 
   useEffect(() => {
     loadEvents()
-  }, [monthDate])
+  }, [monthDate, user])
 
   const today = new Date()
   const todayKey = toDateKey(today.getFullYear(), today.getMonth(), today.getDate())
@@ -169,11 +170,6 @@ export default function CalendarView({ user }) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="font-display font-semibold text-xl text-ink">Calendário</h2>
-        <p className="text-sm text-ink/60">Toque em um dia para ver os compromissos.</p>
-      </div>
-
       <FabButton onClick={openNewEventForm} label="Novo compromisso">
         <Plus size={16} />
       </FabButton>
