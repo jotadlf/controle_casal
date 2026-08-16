@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controle-casal-v2'
+const CACHE_NAME = 'controle-casal-v3'
 const PRECACHE_URLS = [
   './',
   './index.html',
