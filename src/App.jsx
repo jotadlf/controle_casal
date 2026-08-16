@@ -39,7 +39,7 @@ export default function App() {
     <div className="min-h-screen bg-base pb-24 sm:pb-0">
       <header className="border-b border-line bg-white sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="Casa" className="h-7 w-7" />
+          <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="Casa" className="h-9 w-9" />
           <div className="flex items-center gap-2">
             {showInstall && (
               <button
