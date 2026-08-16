@@ -39,7 +39,7 @@ export default function App() {
     <div className="min-h-screen bg-base pb-24 sm:pb-0">
       <header className="border-b border-line bg-white sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="font-display font-bold text-lg text-ink tracking-tight">Casa</h1>
+          <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="Casa" className="h-7 w-7" />
           <div className="flex items-center gap-2">
             {showInstall && (
               <button
@@ -100,7 +100,7 @@ function NamePicker({ onPick }) {
   return (
     <div className="min-h-screen bg-base flex items-center justify-center px-4">
         <div className="bg-white border border-line rounded-card p-8 max-w-sm w-full text-center space-y-4">
-        <h1 className="font-display font-bold text-2xl text-ink">Casa</h1>
+        <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="Casa" className="h-14 w-14 mx-auto" />
         <p className="text-sm text-ink/60">Quem é você?</p>
         <div className="flex flex-col gap-2">
           {['Jairon', 'Bruna'].map((name) => (
