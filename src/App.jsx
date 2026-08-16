@@ -6,6 +6,7 @@ import Bills from './components/Bills'
 import CarMaintenance from './components/CarMaintenance'
 import RepairRequests from './components/RepairRequests'
 import CalendarView from './components/Calendar'
+import { refreshAppBadge } from './lib/badge'
 
 const TABS = [
   { key: 'tarefas', label: 'Tarefas', icon: ListChecks, Component: RepairRequests },
@@ -30,6 +31,20 @@ export default function App() {
     window.addEventListener('beforeinstallprompt', handler)
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    refreshAppBadge(user)
+    const handler = () => {
+      if (document.visibilityState === 'visible') refreshAppBadge(user)
+    }
+    document.addEventListener('visibilitychange', handler)
+    window.addEventListener('focus', handler)
+    return () => {
+      document.removeEventListener('visibilitychange', handler)
+      window.removeEventListener('focus', handler)
+    }
+  }, [user])
 
   if (!user) {
     return <NamePicker onPick={setUser} />

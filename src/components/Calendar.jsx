@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { refreshAppBadge } from '../lib/badge'
 import Modal from './Modal'
 import FabButton from './FabButton'
 
@@ -144,13 +145,16 @@ export default function CalendarView({ user }) {
       setShowForm(false)
       setFormError('')
       setSelectedDate(data.event_date)
+      if (data.event_date === todayKey) refreshAppBadge(user)
     }
   }
 
   async function removeEvent(id) {
+    const removed = events.find((e) => e.id === id)
     await supabase.from('calendar_events').delete().eq('id', id)
     setEvents((prev) => prev.filter((e) => e.id !== id))
     setActiveEventId(null)
+    if (removed?.event_date === todayKey) refreshAppBadge(user)
   }
 
   function changeMonth(delta) {
