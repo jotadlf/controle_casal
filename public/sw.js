@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controle-casal-v3'
+const CACHE_NAME = 'controle-casal-v4'
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -28,24 +28,28 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request
-  // navigation requests: try network, fallback to cache
+
+  // nunca interceptar chamadas de API (Supabase etc.): sempre buscar da rede,
+  // senão dados novos (tarefas, contas...) ficam presos no cache do PWA
+  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) {
+    return
+  }
+
+  // navegação: tenta rede, cai pro cache se offline
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).catch(() => caches.match('./index.html'))
     )
     return
   }
-  // for other requests, try cache first
+
+  // assets estáticos same-origin: cache first
   event.respondWith(
     caches.match(req).then((cached) => cached || fetch(req).then((res) => {
-      // optionally cache runtime assets
       return caches.open(CACHE_NAME).then((cache) => {
         try { cache.put(req, res.clone()) } catch (e) { /* ignore opaque */ }
         return res
       })
-    })).catch(() => {
-      // final fallback: icons or index
-      return caches.match('./icons/icon-192.png')
-    })
+    }))
   )
 })
