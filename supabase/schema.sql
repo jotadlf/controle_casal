@@ -17,3 +17,16 @@ where quantity is null;
 alter table shopping_purchases
   alter column price drop not null,
   alter column unit drop not null;
+
+-- Tabela de eventos do calendário (consultas, compromissos etc).
+create table if not exists calendar_events (
+  id bigint generated always as identity primary key,
+  title text not null,
+  description text,
+  event_date date not null,
+  event_time time,
+  created_by text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists calendar_events_event_date_idx on calendar_events (event_date);
