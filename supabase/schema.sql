@@ -2,9 +2,9 @@
 -- Execute este SQL no editor SQL do Supabase para adicionar os campos usados pelo frontend.
 
 alter table shopping_purchases
-  add column price numeric(10,2),
-  add column quantity integer not null default 1,
-  add column unit text;
+  add column if not exists price numeric(10,2),
+  add column if not exists quantity integer not null default 1,
+  add column if not exists unit text;
 
 -- Caso já exista algum dado antigo e você queira garantir consistência,
 -- mantenha quantity como 1 quando não for informado:
