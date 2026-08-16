@@ -107,7 +107,7 @@ function NamePicker({ onPick }) {
             <button
               key={name}
               onClick={() => onPick(name)}
-              className="w-full py-3 rounded-full border border-line hover:border-teal hover:bg-teal-light font-medium text-ink transition-colors"
+              className="w-full py-2 text-sm rounded-full border border-line hover:border-teal hover:bg-teal-light font-medium text-ink transition-colors"
             >
               {name}
             </button>
