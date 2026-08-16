@@ -213,7 +213,7 @@ export default function CalendarView({ user }) {
                 className="flex flex-col items-center gap-0.5 py-0.5"
               >
                 <span
-                  className={`w-7 h-7 flex items-center justify-center rounded-full text-xs transition-colors ${
+                  className={`w-7 h-7 flex items-center justify-center rounded-full text-xs transition-all duration-300 ${
                     isToday
                       ? 'bg-ink text-white font-medium'
                       : isSelected
@@ -234,8 +234,8 @@ export default function CalendarView({ user }) {
 
       {selectedDate && (
         <div className="fixed inset-0 z-40 flex items-end sm:items-center sm:justify-center">
-          <div className="absolute inset-0 bg-ink/40" onClick={() => setSelectedDate(null)} />
-          <div className="relative bg-white rounded-t-card sm:rounded-card border border-line max-h-[70vh] w-full flex flex-col mx-auto sm:max-w-lg">
+          <div className="absolute inset-0 bg-ink/40 animate-fade-in" onClick={() => setSelectedDate(null)} />
+          <div className="relative bg-white rounded-t-card sm:rounded-card border border-line max-h-[70vh] w-full flex flex-col mx-auto sm:max-w-lg animate-pop-in">
             <div className="flex items-center justify-between px-5 py-4 border-b border-line shrink-0">
               <div>
                 <p className="font-display font-semibold text-ink capitalize">{selectedLabel}</p>
@@ -291,7 +291,7 @@ export default function CalendarView({ user }) {
                           </span>
                         </button>
                         {isActive && (
-                          <div className="absolute left-2 top-4 z-10 bg-white border border-line rounded-card shadow-lg p-3 w-64 max-w-[80vw]">
+                          <div className="absolute left-2 top-4 z-10 bg-white border border-line rounded-card shadow-lg p-3 w-64 max-w-[80vw] animate-pop-in">
                             <p className="font-medium text-ink text-sm">{ev.title}</p>
                             {ev.description && <p className="text-xs text-ink/50 mt-1">{ev.description}</p>}
                             <div className="flex items-center justify-between mt-2">
