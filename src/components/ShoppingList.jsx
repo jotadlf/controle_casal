@@ -21,8 +21,10 @@ export default function ShoppingList({ user }) {
   const [loading, setLoading] = useState(true)
   const [supportsPurchaseExtras, setSupportsPurchaseExtras] = useState(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [showAddInput, setShowAddInput] = useState(false)
   const [alert, setAlert] = useState(null)
   const inputContainerRef = useRef(null)
+  const addInputRef = useRef(null)
 
   useEffect(() => {
     if (!alert) return
@@ -84,6 +86,10 @@ export default function ShoppingList({ user }) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    if (showAddInput) addInputRef.current?.focus()
+  }, [showAddInput])
+
   const today = new Date().toISOString().slice(0, 10)
 
   const sorted = useMemo(() => {
@@ -116,7 +122,11 @@ export default function ShoppingList({ user }) {
     }).format(value)
 
   async function addItem() {
-    if (!newName.trim()) return
+    if (!newName.trim()) {
+      setShowAddInput(false)
+      setShowSuggestions(false)
+      return
+    }
     const { data, error } = await supabase
       .from('shopping_items')
       .insert({ name: newName.trim() })
@@ -126,6 +136,7 @@ export default function ShoppingList({ user }) {
       setItems((prev) => [...prev, data])
       setNewName('')
       setShowSuggestions(false)
+      setShowAddInput(false)
     }
   }
 
@@ -162,6 +173,7 @@ export default function ShoppingList({ user }) {
 
     setNewName('')
     setShowSuggestions(false)
+    setShowAddInput(false)
   }
 
   async function removeItem(id) {
@@ -354,60 +366,68 @@ export default function ShoppingList({ user }) {
         </div>
       )}
 
-      <div className="flex gap-2 items-center">
-        <div className="flex-1 flex flex-col gap-2 sm:flex-row sm:items-center">
-          {shoppingSessionId ? (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <span className="text-sm text-ink/70">Comprando em: <strong>{shoppingSessionStore}</strong></span>
-              <span className="text-sm text-ink/70">Total: <strong>{formatCurrency(sessionTotal)}</strong></span>
-              <button onClick={endSession} className="rounded-full px-3 py-1 text-xs bg-ink text-white hover:bg-ink/80 transition-colors">Finalizar</button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowSessionModal(true)}
-              className="rounded-full px-3 py-1 text-xs border border-line text-ink/70 hover:bg-ink/5 transition-colors"
-            >
-              Iniciar Compras
-            </button>
-          )}
-          <div ref={inputContainerRef} className="relative flex-1">
-            <input
-              value={newName}
-              onChange={(e) => {
-                const value = e.target.value
-                setNewName(value)
-                setShowSuggestions(Boolean(value.trim()))
-              }}
-              onFocus={() => setShowSuggestions(Boolean(newName.trim()))}
-              onKeyDown={(e) => e.key === 'Enter' && addItem()}
-              placeholder="Adicionar item"
-              className="w-full rounded-full border border-line px-4 py-2 text-sm bg-white focus:border-teal outline-none"
-            />
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute left-0 right-0 mt-1 z-10 rounded-card border border-line bg-white shadow-xl overflow-hidden">
-                {suggestions.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => activateSuggestion(item)}
-                    className="w-full text-left px-4 py-3 text-sm text-ink hover:bg-teal-light transition-colors"
-                  >
-                    <div className="font-medium truncate">{item.name}</div>
-                    {item.analysis.timesBought > 0 && (
-                      <div className="text-[11px] text-ink/50 mt-0.5">{item.analysis.timesBought}x comprado</div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {shoppingSessionId ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span className="text-sm text-ink/70">Comprando em: <strong>{shoppingSessionStore}</strong></span>
+            <span className="text-sm text-ink/70">Total: <strong>{formatCurrency(sessionTotal)}</strong></span>
+            <button onClick={endSession} className="rounded-full px-3 py-1 text-xs bg-ink text-white hover:bg-ink/80 transition-colors">Finalizar</button>
           </div>
+        ) : (
+          <button
+            onClick={() => setShowSessionModal(true)}
+            className="rounded-full px-3 py-1 text-xs border border-line text-ink/70 hover:bg-ink/5 transition-colors"
+          >
+            Iniciar Compras
+          </button>
+        )}
+      </div>
+
+      <div className="fixed z-20 bottom-20 right-4 sm:bottom-6 sm:right-6 flex items-center gap-2">
+        <div
+          ref={inputContainerRef}
+          className={`relative overflow-hidden transition-all duration-300 ease-out ${
+            showAddInput ? 'w-48 sm:w-64 opacity-100' : 'w-0 opacity-0'
+          }`}
+        >
+          <input
+            ref={addInputRef}
+            value={newName}
+            onChange={(e) => {
+              const value = e.target.value
+              setNewName(value)
+              setShowSuggestions(Boolean(value.trim()))
+            }}
+            onFocus={() => setShowSuggestions(Boolean(newName.trim()))}
+            onKeyDown={(e) => e.key === 'Enter' && addItem()}
+            placeholder="Adicionar item"
+            className="w-48 sm:w-64 rounded-full border border-line px-4 py-2 text-sm bg-white shadow-lg focus:border-teal outline-none"
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute left-0 right-0 bottom-full mb-1 rounded-card border border-line bg-white shadow-xl overflow-hidden">
+              {suggestions.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => activateSuggestion(item)}
+                  className="w-full text-left px-4 py-3 text-sm text-ink hover:bg-teal-light transition-colors"
+                >
+                  <div className="font-medium truncate">{item.name}</div>
+                  {item.analysis.timesBought > 0 && (
+                    <div className="text-[11px] text-ink/50 mt-0.5">{item.analysis.timesBought}x comprado</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <button
-          onClick={addItem}
-          className="bg-ink text-white rounded-full p-2.5 hover:bg-ink/80 transition-colors"
-          aria-label="Adicionar item"
+          onClick={() => (showAddInput ? addItem() : setShowAddInput(true))}
+          aria-label={showAddInput ? 'Confirmar item' : 'Adicionar item'}
+          title={showAddInput ? 'Confirmar item' : 'Adicionar item'}
+          className="shrink-0 flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full shadow-lg hover:bg-ink/80 transition-colors"
         >
-          <Plus size={18} />
+          {showAddInput ? <Check size={16} /> : <Plus size={16} />}
         </button>
       </div>
 
@@ -415,7 +435,7 @@ export default function ShoppingList({ user }) {
       {loading ? (
         <p className="text-sm text-ink/50">Carregando...</p>
       ) : sorted.length === 0 ? (
-        <EmptyState text="Nenhum item ainda. Adicione o primeiro item acima." />
+        <EmptyState text="Nenhum item ainda. Toque no + abaixo para adicionar." />
       ) : (
         <ul className="space-y-2">
           {sorted.map((item) => {

@@ -251,24 +251,24 @@ export default function Tasks({ user }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display font-semibold text-xl text-ink">Tarefas</h2>
-          <p className="text-sm text-ink/60">Arraste um card para a direita pra concluir, para a esquerda pra remover.</p>
-        </div>
+      <div>
+        <h2 className="font-display font-semibold text-xl text-ink">Tarefas</h2>
+        <p className="text-sm text-ink/60">Arraste um card para a direita pra concluir, para a esquerda pra remover.</p>
+      </div>
+
+      <div className="fixed z-20 bottom-20 right-4 sm:bottom-6 sm:right-6 flex items-center gap-2">
         <button
           onClick={() => setShowCompletedPanel((v) => !v)}
           aria-label="Arquivados"
           title="Arquivados"
-          className="flex items-center justify-center bg-ink/5 text-ink w-10 h-10 rounded-full text-sm font-medium border border-line shrink-0"
+          className="flex items-center justify-center bg-white text-ink w-10 h-10 rounded-full shadow-lg border border-line hover:bg-ink/5 transition-colors"
         >
           <Archive size={16} />
         </button>
+        <FabButton onClick={() => { setFormError(''); setShowForm(true) }} label="Nova tarefa" inline>
+          <Plus size={16} />
+        </FabButton>
       </div>
-
-      <FabButton onClick={() => { setFormError(''); setShowForm(true) }} label="Nova tarefa">
-        <Plus size={16} />
-      </FabButton>
       {alert && (
         <div className={`rounded-card border px-4 py-3 text-sm flex items-start justify-between gap-3 ${
           alert.type === 'error'
