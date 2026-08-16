@@ -1,11 +1,10 @@
 const CACHE_NAME = 'controle-casal-v1'
 const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/styles/index.css',
-  '/manifest.webmanifest',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg'
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './icons/icon-192.svg',
+  './icons/icon-512.svg'
 ]
 
 self.addEventListener('install', (event) => {
@@ -32,7 +31,7 @@ self.addEventListener('fetch', (event) => {
   // navigation requests: try network, fallback to cache
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).catch(() => caches.match('/index.html'))
+      fetch(req).catch(() => caches.match('./index.html'))
     )
     return
   }
@@ -46,7 +45,7 @@ self.addEventListener('fetch', (event) => {
       })
     })).catch(() => {
       // final fallback: icons or index
-      return caches.match('/icons/icon-192.svg')
+      return caches.match('./icons/icon-192.svg')
     })
   )
 })
