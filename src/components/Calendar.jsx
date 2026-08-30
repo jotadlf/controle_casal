@@ -49,7 +49,7 @@ export default function CalendarView({ user }) {
   const [editingEventId, setEditingEventId] = useState(null)
   const [now, setNow] = useState(() => new Date())
   const timelineRef = useRef(null)
-  const [staleTasks, setStaleTasks] = useState([])
+  const [highPriorityTasks, setHighPriorityTasks] = useState([])
   const [dueBills, setDueBills] = useState([])
 
   useEffect(() => {
@@ -62,21 +62,12 @@ export default function CalendarView({ user }) {
     today.setHours(0, 0, 0, 0)
     const todayDay = today.getDate()
     const refMonth = currentReferenceMonth()
-    const MS_PER_DAY = 1000 * 60 * 60 * 24
 
     const [{ data: tasksData }, { data: billsData }, { data: paymentsData }] = await Promise.all([
-      supabase.from('repair_requests').select('*').neq('status', 'concluido'),
+      supabase.from('repair_requests').select('*').eq('status', 'pendente').eq('priority', 'alta'),
       supabase.from('bills').select('*').eq('active', true),
       supabase.from('bill_payments').select('*').eq('reference_month', refMonth),
     ])
-
-    const stale = (tasksData || []).filter((t) => {
-      if (!t.due_date) return false
-      const created = new Date(t.due_date)
-      if (isNaN(created.getTime())) return false
-      const daysOld = Math.floor((today.getTime() - created.getTime()) / MS_PER_DAY)
-      return daysOld > 5
-    })
 
     const paidBillIds = new Set((paymentsData || []).filter((p) => p.paid).map((p) => p.bill_id))
     const due = (billsData || []).filter((bill) => {
@@ -88,7 +79,7 @@ export default function CalendarView({ user }) {
       return bill.due_day <= todayDay
     })
 
-    setStaleTasks(stale)
+    setHighPriorityTasks(tasksData || [])
     setDueBills(due)
   }
 
@@ -328,12 +319,12 @@ export default function CalendarView({ user }) {
         <h3 className="font-display font-semibold text-sm text-ink">Resumo do dia</h3>
 
         <div>
-          <p className="text-xs text-ink/40 mb-1.5">Tarefas pendentes há mais de 5 dias</p>
-          {staleTasks.length === 0 ? (
+          <p className="text-xs text-ink/40 mb-1.5">Tarefas de prioridade alta</p>
+          {highPriorityTasks.length === 0 ? (
             <p className="text-xs text-ink/30">Nenhuma.</p>
           ) : (
             <ul className="space-y-1.5">
-              {staleTasks.map((t) => (
+              {highPriorityTasks.map((t) => (
                 <li key={t.id} className="text-sm text-ink flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-coral shrink-0" />
                   <span className="truncate">{t.title}</span>
