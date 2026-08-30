@@ -9,15 +9,15 @@ import CalendarView from './components/Calendar'
 import { refreshAppBadge } from './lib/badge'
 
 const TABS = [
+  { key: 'calendario', label: 'Calendário', icon: Calendar, Component: CalendarView },
   { key: 'tarefas', label: 'Tarefas', icon: ListChecks, Component: RepairRequests },
   { key: 'compras', label: 'Compras', icon: ShoppingCart, Component: ShoppingList },
   { key: 'contas', label: 'Contas', icon: Receipt, Component: Bills },
   { key: 'carro', label: 'Carro', icon: Car, Component: CarMaintenance },
-  { key: 'calendario', label: 'Calendário', icon: Calendar, Component: CalendarView },
 ]
 
 export default function App() {
-  const [tab, setTab] = useState('tarefas')
+  const [tab, setTab] = useState('calendario')
   const [user, setUser] = useCurrentUser()
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [showInstall, setShowInstall] = useState(false)
