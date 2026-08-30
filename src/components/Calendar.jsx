@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { refreshAppBadge } from '../lib/badge'
+import { currentReferenceMonth, installmentNumber } from '../lib/bills'
 import Modal from './Modal'
 import FabButton from './FabButton'
 
@@ -48,10 +49,51 @@ export default function CalendarView({ user }) {
   const [editingEventId, setEditingEventId] = useState(null)
   const [now, setNow] = useState(() => new Date())
   const timelineRef = useRef(null)
+  const [staleTasks, setStaleTasks] = useState([])
+  const [dueBills, setDueBills] = useState([])
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60000)
     return () => clearInterval(id)
+  }, [])
+
+  async function loadDaySummary() {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayDay = today.getDate()
+    const refMonth = currentReferenceMonth()
+    const MS_PER_DAY = 1000 * 60 * 60 * 24
+
+    const [{ data: tasksData }, { data: billsData }, { data: paymentsData }] = await Promise.all([
+      supabase.from('repair_requests').select('*').neq('status', 'concluido'),
+      supabase.from('bills').select('*').eq('active', true),
+      supabase.from('bill_payments').select('*').eq('reference_month', refMonth),
+    ])
+
+    const stale = (tasksData || []).filter((t) => {
+      if (!t.due_date) return false
+      const created = new Date(t.due_date)
+      if (isNaN(created.getTime())) return false
+      const daysOld = Math.floor((today.getTime() - created.getTime()) / MS_PER_DAY)
+      return daysOld > 5
+    })
+
+    const paidBillIds = new Set((paymentsData || []).filter((p) => p.paid).map((p) => p.bill_id))
+    const due = (billsData || []).filter((bill) => {
+      if (paidBillIds.has(bill.id)) return false
+      if (bill.recurrence_type === 'installment') {
+        const number = installmentNumber(bill, refMonth)
+        if (number < 1 || number > bill.installments_total) return false
+      }
+      return bill.due_day <= todayDay
+    })
+
+    setStaleTasks(stale)
+    setDueBills(due)
+  }
+
+  useEffect(() => {
+    loadDaySummary()
   }, [])
 
   async function loadEvents() {
@@ -280,6 +322,47 @@ export default function CalendarView({ user }) {
         </div>
 
         {loading && <p className="text-xs text-ink/40 mt-2">Carregando...</p>}
+      </div>
+
+      <div className="bg-white border border-line rounded-card p-4 space-y-4">
+        <h3 className="font-display font-semibold text-sm text-ink">Resumo do dia</h3>
+
+        <div>
+          <p className="text-xs text-ink/40 mb-1.5">Tarefas pendentes há mais de 5 dias</p>
+          {staleTasks.length === 0 ? (
+            <p className="text-xs text-ink/30">Nenhuma.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {staleTasks.map((t) => (
+                <li key={t.id} className="text-sm text-ink flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-coral shrink-0" />
+                  <span className="truncate">{t.title}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <p className="text-xs text-ink/40 mb-1.5">Contas vencendo hoje ou atrasadas</p>
+          {dueBills.length === 0 ? (
+            <p className="text-xs text-ink/30">Nenhuma.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {dueBills.map((bill) => {
+                const overdueDays = now.getDate() - bill.due_day
+                return (
+                  <li key={bill.id} className="text-sm text-ink flex items-center justify-between gap-2">
+                    <span className="truncate">{bill.name}</span>
+                    <span className="text-xs text-coral shrink-0">
+                      {overdueDays > 0 ? `Venceu há ${overdueDays}d` : 'Vence hoje'}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       </div>
 
       {selectedDate && (
