@@ -325,9 +325,12 @@ export default function CalendarView({ user }) {
           ) : (
             <ul className="space-y-1.5">
               {highPriorityTasks.map((t) => (
-                <li key={t.id} className="text-sm text-ink flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-coral shrink-0" />
-                  <span className="truncate">{t.title}</span>
+                <li key={t.id} className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-coral shrink-0" />
+                    <span className="text-sm text-ink truncate">{t.title}</span>
+                  </span>
+                  <span className="text-xs text-coral shrink-0">Alta</span>
                 </li>
               ))}
             </ul>
@@ -343,8 +346,11 @@ export default function CalendarView({ user }) {
               {dueBills.map((bill) => {
                 const overdueDays = now.getDate() - bill.due_day
                 return (
-                  <li key={bill.id} className="text-sm text-ink flex items-center justify-between gap-2">
-                    <span className="truncate">{bill.name}</span>
+                  <li key={bill.id} className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-coral shrink-0" />
+                      <span className="text-sm text-ink truncate">{bill.name}</span>
+                    </span>
                     <span className="text-xs text-coral shrink-0">
                       {overdueDays > 0 ? `Venceu há ${overdueDays}d` : 'Vence hoje'}
                     </span>
