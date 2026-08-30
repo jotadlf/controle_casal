@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Trash2, Check, CheckCircle2, Circle, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Check, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { dueDateInMonth, daysUntil, referenceMonthOf, currentReferenceMonth, monthLabel, urgencyColor, installmentNumber } from '../lib/bills'
 import { EmptyState } from './ShoppingList'
@@ -8,6 +8,7 @@ import FabButton from './FabButton'
 
 const CATEGORIES = ['Aluguel', 'Água', 'Luz', 'Internet', 'Gás', 'Outro']
 const DRAG_THRESHOLD = 88
+const CLICK_THRESHOLD = 6
 
 export default function Bills({ user }) {
   const [bills, setBills] = useState([])
@@ -167,9 +168,10 @@ export default function Bills({ user }) {
     setBills((prev) => prev.filter((b) => b.id !== id))
   }
 
-  // arrastar card: direita = marcar pago/reabrir, esquerda = remover
+  // arrastar card: direita = marcar pago/reabrir, esquerda = remover, toque = expandir detalhes
   const dragStartX = useRef(0)
   const [drag, setDrag] = useState({ id: null, x: 0, dragging: false })
+  const [openId, setOpenId] = useState(null)
 
   function handleDragStart(e, id) {
     dragStartX.current = e.clientX
@@ -188,6 +190,12 @@ export default function Bills({ user }) {
     const dx = drag.x
 
     if (!drag.dragging) return
+
+    if (Math.abs(dx) < CLICK_THRESHOLD) {
+      setDrag({ id: null, x: 0, dragging: false })
+      setOpenId((prev) => (prev === id ? null : id))
+      return
+    }
 
     if (dx > DRAG_THRESHOLD) {
       setDrag({ id: null, x: 0, dragging: false })
@@ -245,7 +253,7 @@ export default function Bills({ user }) {
     <div className="space-y-5">
       <div>
         <h2 className="font-display font-semibold text-xl text-ink">Contas</h2>
-        <p className="text-xs text-ink/40 mt-0.5">Arraste uma conta para a direita pra marcar como paga, para a esquerda pra remover.</p>
+        <p className="text-xs text-ink/40 mt-0.5">Toque numa conta pra ver detalhes, arraste para a direita pra marcar como paga, para a esquerda pra remover.</p>
       </div>
 
       <div className="flex items-center justify-between bg-white border border-line rounded-card px-3 py-2">
@@ -391,6 +399,7 @@ export default function Bills({ user }) {
             const isDragging = drag.id === bill.id
             const isActiveDrag = isDragging && drag.dragging
             const dragX = isDragging ? drag.x : 0
+            const isOpen = openId === bill.id
             return (
               <li key={bill.id} className="relative rounded-card overflow-hidden">
                 <div className="absolute inset-0 flex items-center justify-between px-5">
@@ -405,51 +414,54 @@ export default function Bills({ user }) {
                 </div>
 
                 <div
-                  className="relative flex items-center gap-3 bg-white rounded-card border border-line px-4 py-3"
+                  className="relative bg-white rounded-card border border-line"
                   style={{
                     transform: `translateX(${dragX}px)`,
                     transition: isActiveDrag ? 'none' : 'transform 0.2s ease',
                     touchAction: 'pan-y',
                   }}
-                  onPointerDown={(e) => handleDragStart(e, bill.id)}
-                  onPointerMove={(e) => handleDragMove(e, bill.id)}
-                  onPointerUp={(e) => handleDragEnd(e, bill.id, bill)}
-                  onPointerCancel={() => setDrag({ id: null, x: 0, dragging: false })}
                 >
-                  <span className="shrink-0 text-teal">
-                    {paid ? <CheckCircle2 size={22} /> : <Circle size={22} className="text-ink/20" />}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className={`font-medium ${paid ? 'text-ink/40 line-through' : 'text-ink'}`}>{bill.name}</p>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-xs text-ink/40">
-                        {bill.category}
-                        {bill.amount ? ` · R$ ${Number(bill.amount).toFixed(2)}` : ''}
-                      </span>
-                      {bill.installment && (
-                        <span className="text-xs px-2 py-0.5 rounded-full border border-line text-ink/50">
-                          Parcela {bill.installment.number}/{bill.installment.total}
-                        </span>
-                      )}
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[color]}`}>
-                        {paid
-                          ? 'Pago'
-                          : bill.left < 0
-                          ? `Venceu há ${Math.abs(bill.left)}d`
-                          : bill.left === 0
-                          ? 'Vence hoje'
-                          : `Vence em ${bill.left}d`}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openEditForm(bill) }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    aria-label="Editar conta"
-                    className="shrink-0 p-2 text-ink/30 hover:text-ink/60 rounded-full"
+                  <div
+                    className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer"
+                    onPointerDown={(e) => handleDragStart(e, bill.id)}
+                    onPointerMove={(e) => handleDragMove(e, bill.id)}
+                    onPointerUp={(e) => handleDragEnd(e, bill.id, bill)}
+                    onPointerCancel={() => setDrag({ id: null, x: 0, dragging: false })}
                   >
-                    <Pencil size={14} />
-                  </button>
+                    <p className={`font-medium truncate ${paid ? 'text-ink/40 line-through' : 'text-ink'}`}>{bill.name}</p>
+                    <span className={`text-sm shrink-0 ${paid ? 'text-ink/40 line-through' : 'text-ink'}`}>
+                      {bill.amount ? formatCurrency(bill.amount) : '—'}
+                    </span>
+                  </div>
+
+                  {isOpen && (
+                    <div className="px-4 pb-3 pt-1 border-t border-line/60 flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-ink/40">{bill.category}</span>
+                        {bill.installment && (
+                          <span className="text-xs px-2 py-0.5 rounded-full border border-line text-ink/50">
+                            Parcela {bill.installment.number}/{bill.installment.total}
+                          </span>
+                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[color]}`}>
+                          {paid
+                            ? 'Pago'
+                            : bill.left < 0
+                            ? `Venceu há ${Math.abs(bill.left)}d`
+                            : bill.left === 0
+                            ? 'Vence hoje'
+                            : `Vence em ${bill.left}d`}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => openEditForm(bill)}
+                        aria-label="Editar conta"
+                        className="shrink-0 p-2 text-ink/30 hover:text-ink/60 rounded-full"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </li>
             )
