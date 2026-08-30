@@ -7,6 +7,7 @@ import PurchaseModal from './PurchaseModal'
 import Modal from './Modal'
 
 const DRAG_THRESHOLD = 88
+const CLICK_THRESHOLD = 6
 
 export default function ShoppingList({ user }) {
   const [items, setItems] = useState([])
@@ -211,9 +212,10 @@ export default function ShoppingList({ user }) {
     setPurchaseTarget(item)
   }
 
-  // arrastar card: direita = marcar como comprado, esquerda = remover
+  // arrastar card: direita = marcar como comprado, esquerda = remover, toque = expandir detalhes
   const dragStartX = useRef(0)
   const [drag, setDrag] = useState({ id: null, x: 0, dragging: false })
+  const [openId, setOpenId] = useState(null)
 
   function handleDragStart(e, id) {
     if (purchaseTarget) return
@@ -233,6 +235,12 @@ export default function ShoppingList({ user }) {
     const dx = drag.x
 
     if (!drag.dragging) return
+
+    if (Math.abs(dx) < CLICK_THRESHOLD) {
+      setDrag({ id: null, x: 0, dragging: false })
+      setOpenId((prev) => (prev === id ? null : id))
+      return
+    }
 
     if (dx > DRAG_THRESHOLD) {
       setDrag({ id: null, x: 0, dragging: false })
@@ -369,7 +377,7 @@ export default function ShoppingList({ user }) {
         <div>
           <h2 className="font-display font-semibold text-xl text-ink">Lista de compras</h2>
           <p className="text-sm text-ink/60">Previsão automática baseada no histórico de compras.</p>
-          <p className="text-xs text-ink/40 mt-0.5">Arraste um item para a direita pra comprar, para a esquerda pra remover.</p>
+          <p className="text-xs text-ink/40 mt-0.5">Toque num item pra ver detalhes, arraste para a direita pra comprar, para a esquerda pra remover.</p>
         </div>
       </div>
       {alert && (
@@ -477,6 +485,7 @@ export default function ShoppingList({ user }) {
             const isDragging = drag.id === item.id
             const isActiveDrag = isDragging && drag.dragging
             const dragX = isDragging ? drag.x : 0
+            const isOpen = openId === item.id
             return (
               <li key={item.id} className="relative rounded-card overflow-hidden">
                 <div className="absolute inset-0 flex items-center justify-between px-5">
@@ -491,47 +500,55 @@ export default function ShoppingList({ user }) {
                 </div>
 
                 <div
-                  className="relative flex items-center justify-between gap-3 bg-white rounded-card border border-line px-4 py-3"
+                  className="relative bg-white rounded-card border border-line"
                   style={{
                     transform: `translateX(${dragX}px)`,
                     transition: isActiveDrag ? 'none' : 'transform 0.2s ease',
                     touchAction: 'pan-y',
                   }}
-                  onPointerDown={(e) => handleDragStart(e, item.id)}
-                  onPointerMove={(e) => handleDragMove(e, item.id)}
-                  onPointerUp={(e) => handleDragEnd(e, item.id, item)}
-                  onPointerCancel={() => setDrag({ id: null, x: 0, dragging: false })}
                 >
-                  <div className="min-w-0">
+                  <div
+                    className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer"
+                    onPointerDown={(e) => handleDragStart(e, item.id)}
+                    onPointerMove={(e) => handleDragMove(e, item.id)}
+                    onPointerUp={(e) => handleDragEnd(e, item.id, item)}
+                    onPointerCancel={() => setDrag({ id: null, x: 0, dragging: false })}
+                  >
                     <p className={`font-medium truncate ${alreadyBoughtToday ? 'text-ink/40 line-through' : 'text-ink'}`}>
                       {item.name}
                     </p>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[u.color]}`}>
-                        {u.label}
-                      </span>
-                      {item.analysis.timesBought > 0 && (() => {
-                        const itemPurchs = purchases
-                          .filter((p) => p.item_id === item.id)
-                          .sort((a, b) => new Date(a.purchased_at) - new Date(b.purchased_at))
-                        const last = itemPurchs[itemPurchs.length - 1]
-                        const store = last?.shopping_sessions?.store_name
-                        return (
-                          <span className="text-xs text-ink/40">
-                            {item.analysis.timesBought}x comprado{store ? ` · ${store}` : ''}
-                          </span>
-                        )
-                      })()}
-                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${colorMap[u.color]}`}>
+                      {u.label}
+                    </span>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openEditItem(item) }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    aria-label="Editar item"
-                    className="shrink-0 p-2 text-ink/30 hover:text-ink/60 rounded-full"
-                  >
-                    <Pencil size={14} />
-                  </button>
+
+                  {isOpen && (
+                    <div className="px-4 pb-3 pt-1 border-t border-line/60 flex items-center justify-between gap-2 flex-wrap">
+                      <div className="min-w-0">
+                        {item.analysis.timesBought > 0 ? (() => {
+                          const itemPurchs = purchases
+                            .filter((p) => p.item_id === item.id)
+                            .sort((a, b) => new Date(a.purchased_at) - new Date(b.purchased_at))
+                          const last = itemPurchs[itemPurchs.length - 1]
+                          const store = last?.shopping_sessions?.store_name
+                          return (
+                            <span className="text-xs text-ink/40">
+                              {item.analysis.timesBought}x comprado{store ? ` · ${store}` : ''}
+                            </span>
+                          )
+                        })() : (
+                          <span className="text-xs text-ink/40">Ainda não comprado.</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => openEditItem(item)}
+                        aria-label="Editar item"
+                        className="shrink-0 p-2 text-ink/30 hover:text-ink/60 rounded-full"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </li>
             )
