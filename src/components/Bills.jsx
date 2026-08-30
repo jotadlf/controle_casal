@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Trash2, Check, CheckCircle2, Circle, Pencil } from 'lucide-react'
+import { Plus, Trash2, Check, CheckCircle2, Circle, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
-import { nextDueDate, daysUntil, currentReferenceMonth, urgencyColor, installmentNumber } from '../lib/bills'
+import { dueDateInMonth, daysUntil, referenceMonthOf, currentReferenceMonth, monthLabel, urgencyColor, installmentNumber } from '../lib/bills'
 import { EmptyState } from './ShoppingList'
 import Modal from './Modal'
 import FabButton from './FabButton'
@@ -24,6 +24,17 @@ export default function Bills({ user }) {
   const [formError, setFormError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
+
+  const viewRefMonth = referenceMonthOf(viewMonth)
+  const isCurrentMonth = viewRefMonth === currentReferenceMonth()
+
+  function changeMonth(delta) {
+    setViewMonth((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1))
+  }
 
   const { totalOpen, totalPaid } = useMemo(() => {
     let open = 0
@@ -51,26 +62,16 @@ export default function Bills({ user }) {
 
   async function loadAll() {
     setLoading(true)
-    const refMonth = currentReferenceMonth()
     const [{ data: billsData }, { data: paymentsData }] = await Promise.all([
       supabase.from('bills').select('*').eq('active', true).order('due_day'),
-      supabase.from('bill_payments').select('*').eq('reference_month', refMonth),
+      supabase.from('bill_payments').select('*').eq('reference_month', viewRefMonth),
     ])
     const allBills = billsData || []
-    const finishedIds = []
     const currentBills = allBills.filter((bill) => {
       if (bill.recurrence_type !== 'installment') return true
-      const number = installmentNumber(bill, refMonth)
-      if (number > bill.installments_total) {
-        finishedIds.push(bill.id)
-        return false
-      }
-      return true
+      const number = installmentNumber(bill, viewRefMonth)
+      return number >= 1 && number <= bill.installments_total
     })
-
-    if (finishedIds.length) {
-      supabase.from('bills').update({ active: false }).in('id', finishedIds)
-    }
 
     setBills(currentBills)
     setPayments(paymentsData || [])
@@ -79,24 +80,24 @@ export default function Bills({ user }) {
 
   useEffect(() => {
     loadAll()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewRefMonth])
 
   const rows = useMemo(() => {
-    const refMonth = currentReferenceMonth()
     return bills.map((bill) => {
       const payment = payments.find((p) => p.bill_id === bill.id)
-      const due = nextDueDate(bill.due_day)
+      const due = dueDateInMonth(bill.due_day, viewMonth)
       const left = daysUntil(due)
       const installment =
         bill.recurrence_type === 'installment'
-          ? { number: installmentNumber(bill, refMonth), total: bill.installments_total }
+          ? { number: installmentNumber(bill, viewRefMonth), total: bill.installments_total }
           : null
       return { ...bill, payment, due, left, installment }
     }).sort((a, b) => {
       if (!!a.payment?.paid !== !!b.payment?.paid) return a.payment?.paid ? 1 : -1
       return a.left - b.left
     })
-  }, [bills, payments])
+  }, [bills, payments, viewMonth, viewRefMonth])
 
   function resetForm() {
     setForm({ name: '', category: 'Outro', amount: '', due_day: '', recurrence_type: 'recurring', installments_total: '' })
@@ -146,7 +147,7 @@ export default function Bills({ user }) {
     } else {
       const { data, error } = await supabase
         .from('bills')
-        .insert({ ...payload, active: true, start_month: currentReferenceMonth() })
+        .insert({ ...payload, active: true, start_month: viewRefMonth })
         .select()
         .single()
       if (error) {
@@ -207,7 +208,7 @@ export default function Bills({ user }) {
   }
 
   async function togglePaid(bill) {
-    const refMonth = currentReferenceMonth()
+    const refMonth = viewRefMonth
     if (bill.payment) {
       const { data } = await supabase
         .from('bill_payments')
@@ -244,8 +245,27 @@ export default function Bills({ user }) {
     <div className="space-y-5">
       <div>
         <h2 className="font-display font-semibold text-xl text-ink">Contas</h2>
-        <p className="text-sm text-ink/60">Vencimentos do mês atual.</p>
         <p className="text-xs text-ink/40 mt-0.5">Arraste uma conta para a direita pra marcar como paga, para a esquerda pra remover.</p>
+      </div>
+
+      <div className="flex items-center justify-between bg-white border border-line rounded-card px-3 py-2">
+        <button onClick={() => changeMonth(-1)} aria-label="Mês anterior" className="p-1.5 rounded-full text-ink/50 hover:bg-ink/5">
+          <ChevronLeft size={16} />
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="font-display font-semibold text-sm text-ink capitalize">{monthLabel(viewMonth)}</span>
+          {!isCurrentMonth && (
+            <button
+              onClick={() => setViewMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}
+              className="text-xs px-2 py-0.5 rounded-full border border-line text-ink/60 hover:bg-ink/5"
+            >
+              Hoje
+            </button>
+          )}
+        </div>
+        <button onClick={() => changeMonth(1)} aria-label="Próximo mês" className="p-1.5 rounded-full text-ink/50 hover:bg-ink/5">
+          <ChevronRight size={16} />
+        </button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -362,7 +382,7 @@ export default function Bills({ user }) {
       {loading ? (
         <p className="text-sm text-ink/50">Carregando...</p>
       ) : rows.length === 0 ? (
-        <EmptyState text="Nenhuma conta cadastrada ainda." />
+        <EmptyState text="Nenhuma conta neste mês." />
       ) : (
         <ul className="space-y-2">
           {rows.map((bill) => {

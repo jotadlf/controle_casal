@@ -1,14 +1,6 @@
-// Calcula a próxima data de vencimento a partir do dia do mês configurado.
-export function nextDueDate(dueDay) {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = today.getMonth()
-
-  let due = new Date(year, month, dueDay)
-  if (due < today) {
-    due = new Date(year, month + 1, dueDay)
-  }
-  return due
+// Data de vencimento dentro de um mês específico (usado para navegação por mês).
+export function dueDateInMonth(dueDay, monthDate) {
+  return new Date(monthDate.getFullYear(), monthDate.getMonth(), dueDay)
 }
 
 export function daysUntil(date) {
@@ -16,9 +8,17 @@ export function daysUntil(date) {
   return Math.round(ms / (1000 * 60 * 60 * 24))
 }
 
+export function referenceMonthOf(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
+}
+
 export function currentReferenceMonth() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  return referenceMonthOf(new Date())
+}
+
+export function monthLabel(date) {
+  const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
 export function monthsBetween(startMonth, refMonth) {
