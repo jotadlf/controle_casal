@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Trash2, Check, CheckCircle2, Circle } from 'lucide-react'
+import { Plus, Trash2, Check, CheckCircle2, Circle, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { nextDueDate, daysUntil, currentReferenceMonth, urgencyColor, installmentNumber } from '../lib/bills'
 import { EmptyState } from './ShoppingList'
@@ -23,14 +23,23 @@ export default function Bills({ user }) {
   })
   const [formError, setFormError] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState(null)
 
-  const totalSpentThisMonth = useMemo(() => {
-    const activeBillIds = new Set(bills.map((bill) => bill.id))
-    return payments.reduce((sum, payment) => {
-      if (!payment.paid || !activeBillIds.has(payment.bill_id)) return sum
-      return sum + Number(payment.amount ?? 0)
-    }, 0)
-  }, [payments, bills])
+  const { totalOpen, totalPaid } = useMemo(() => {
+    let open = 0
+    let paid = 0
+    for (const bill of bills) {
+      const payment = payments.find((p) => p.bill_id === bill.id)
+      if (payment?.paid) {
+        paid += Number(payment.amount ?? 0)
+      } else {
+        open += Number(bill.amount ?? 0)
+      }
+    }
+    return { totalOpen: open, totalPaid: paid }
+  }, [bills, payments])
+
+  const totalGeral = totalOpen + totalPaid
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat('pt-BR', {
@@ -89,7 +98,26 @@ export default function Bills({ user }) {
     })
   }, [bills, payments])
 
-  async function addBill() {
+  function resetForm() {
+    setForm({ name: '', category: 'Outro', amount: '', due_day: '', recurrence_type: 'recurring', installments_total: '' })
+    setEditingId(null)
+  }
+
+  function openEditForm(bill) {
+    setEditingId(bill.id)
+    setForm({
+      name: bill.name,
+      category: bill.category,
+      amount: bill.amount != null ? String(bill.amount) : '',
+      due_day: String(bill.due_day),
+      recurrence_type: bill.recurrence_type || 'recurring',
+      installments_total: bill.installments_total != null ? String(bill.installments_total) : '',
+    })
+    setFormError('')
+    setShowForm(true)
+  }
+
+  async function saveBill() {
     if (!form.name.trim() || !form.due_day) {
       setFormError('Informe o nome e o dia de vencimento.')
       return
@@ -99,30 +127,38 @@ export default function Bills({ user }) {
       setFormError('Informe a quantidade de parcelas.')
       return
     }
-    const { data, error } = await supabase
-      .from('bills')
-      .insert({
-        name: form.name.trim(),
-        category: form.category,
-        amount: form.amount ? Number(form.amount) : null,
-        due_day: Number(form.due_day),
-        active: true,
-        recurrence_type: form.recurrence_type,
-        installments_total: isInstallment ? Number(form.installments_total) : null,
-        start_month: currentReferenceMonth(),
-      })
-      .select()
-      .single()
-    if (error) {
-      setFormError(`Falha ao salvar conta: ${error.message}`)
-      return
+    const payload = {
+      name: form.name.trim(),
+      category: form.category,
+      amount: form.amount ? Number(form.amount) : null,
+      due_day: Number(form.due_day),
+      recurrence_type: form.recurrence_type,
+      installments_total: isInstallment ? Number(form.installments_total) : null,
     }
-    if (data) {
-      setBills((prev) => [...prev, data])
-      setForm({ name: '', category: 'Outro', amount: '', due_day: '', recurrence_type: 'recurring', installments_total: '' })
-      setFormError('')
-      setShowForm(false)
+
+    if (editingId) {
+      const { data, error } = await supabase.from('bills').update(payload).eq('id', editingId).select().single()
+      if (error) {
+        setFormError(`Falha ao salvar conta: ${error.message}`)
+        return
+      }
+      if (data) setBills((prev) => prev.map((b) => (b.id === data.id ? data : b)))
+    } else {
+      const { data, error } = await supabase
+        .from('bills')
+        .insert({ ...payload, active: true, start_month: currentReferenceMonth() })
+        .select()
+        .single()
+      if (error) {
+        setFormError(`Falha ao salvar conta: ${error.message}`)
+        return
+      }
+      if (data) setBills((prev) => [...prev, data])
     }
+
+    resetForm()
+    setFormError('')
+    setShowForm(false)
   }
 
   async function removeBill(id) {
@@ -209,28 +245,42 @@ export default function Bills({ user }) {
       <div>
         <h2 className="font-display font-semibold text-xl text-ink">Contas</h2>
         <p className="text-sm text-ink/60">Vencimentos do mês atual.</p>
-        <p className="text-sm text-teal font-semibold">Gasto total do mês: {formatCurrency(totalSpentThisMonth)}</p>
         <p className="text-xs text-ink/40 mt-0.5">Arraste uma conta para a direita pra marcar como paga, para a esquerda pra remover.</p>
       </div>
 
-      <FabButton onClick={() => { setFormError(''); setShowForm(true) }} label="Nova conta">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white border border-line rounded-card p-3">
+          <p className="text-xs text-ink/40">Em aberto</p>
+          <p className="font-display font-semibold text-lg text-coral">{formatCurrency(totalOpen)}</p>
+        </div>
+        <div className="bg-white border border-line rounded-card p-3">
+          <p className="text-xs text-ink/40">Pago</p>
+          <p className="font-display font-semibold text-lg text-teal-dark">{formatCurrency(totalPaid)}</p>
+        </div>
+        <div className="bg-white border border-line rounded-card p-3">
+          <p className="text-xs text-ink/40">Total</p>
+          <p className="font-display font-semibold text-lg text-ink">{formatCurrency(totalGeral)}</p>
+        </div>
+      </div>
+
+      <FabButton onClick={() => { resetForm(); setFormError(''); setShowForm(true) }} label="Nova conta">
         <Plus size={16} />
       </FabButton>
 
       {showForm && (
         <Modal
-          title="Nova conta"
-          onClose={() => { setShowForm(false); setFormError('') }}
+          title={editingId ? 'Editar conta' : 'Nova conta'}
+          onClose={() => { setShowForm(false); setFormError(''); resetForm() }}
           footer={
             <div className="flex gap-2">
               <button
-                onClick={() => { setShowForm(false); setFormError('') }}
+                onClick={() => { setShowForm(false); setFormError(''); resetForm() }}
                 className="flex-1 py-2 rounded-full border border-line text-sm"
               >
                 Cancelar
               </button>
-              <button onClick={addBill} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
-                Salvar conta
+              <button onClick={saveBill} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+                {editingId ? 'Salvar alterações' : 'Salvar conta'}
               </button>
             </div>
           }
@@ -372,6 +422,14 @@ export default function Bills({ user }) {
                       </span>
                     </div>
                   </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openEditForm(bill) }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    aria-label="Editar conta"
+                    className="shrink-0 p-2 text-ink/30 hover:text-ink/60 rounded-full"
+                  >
+                    <Pencil size={14} />
+                  </button>
                 </div>
               </li>
             )

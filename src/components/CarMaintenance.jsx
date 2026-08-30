@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Trash2, Fuel, Wrench, Droplet, MapPin, HelpCircle } from 'lucide-react'
+import { Plus, Trash2, Pencil, Fuel, Wrench, Droplet, MapPin, HelpCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { EmptyState } from './ShoppingList'
 import Modal from './Modal'
@@ -20,6 +20,7 @@ export default function CarMaintenance({ user }) {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [formError, setFormError] = useState('')
+  const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({
     type: 'combustivel',
     date: new Date().toISOString().slice(0, 10),
@@ -164,34 +165,73 @@ export default function CarMaintenance({ user }) {
 
   const lastOilChange = entries.find((e) => e.type === 'oleo')
 
-  async function addEntry() {
+  function resetForm() {
+    setForm({ type: 'combustivel', date: new Date().toISOString().slice(0, 10), km: '', value: '', description: '' })
+    setEditingId(null)
+  }
+
+  function openEditForm(entry) {
+    setEditingId(entry.id)
+    setForm({
+      type: entry.type,
+      date: entry.date,
+      km: entry.km != null ? String(entry.km) : '',
+      value: String(entry.value),
+      description: entry.description || '',
+    })
+    setFormError('')
+    setShowForm(true)
+  }
+
+  async function saveEntry() {
     if (!form.value) {
       setFormError('Informe o valor gasto.')
       return
     }
-    const { data, error } = await supabase
-      .from('car_maintenance')
-      .insert({
-        type: form.type,
-        date: form.date,
-        km: form.km ? Number(form.km) : null,
-        value: Number(form.value),
-        description: form.description,
-        created_by: user,
-      })
-      .select()
-      .single()
-    if (error) {
-      setFormError(`Falha ao salvar registro: ${error.message}`)
-      return
+    const payload = {
+      type: form.type,
+      date: form.date,
+      km: form.km ? Number(form.km) : null,
+      value: Number(form.value),
+      description: form.description,
     }
-    if (data) {
-      const newEntries = [data, ...entries]
-      setEntries(newEntries)
-      setForm({ type: 'combustivel', date: new Date().toISOString().slice(0, 10), km: '', value: '', description: '' })
-      setFormError('')
-      setShowForm(false)
-      await syncCarBillFromEntries(data.date, newEntries)
+
+    if (editingId) {
+      const previous = entries.find((e) => e.id === editingId)
+      const { data, error } = await supabase.from('car_maintenance').update(payload).eq('id', editingId).select().single()
+      if (error) {
+        setFormError(`Falha ao salvar registro: ${error.message}`)
+        return
+      }
+      if (data) {
+        const newEntries = entries.map((e) => (e.id === data.id ? data : e))
+        setEntries(newEntries)
+        resetForm()
+        setFormError('')
+        setShowForm(false)
+        await syncCarBillFromEntries(data.date, newEntries)
+        if (previous && previous.date !== data.date) {
+          await syncCarBillFromEntries(previous.date, newEntries)
+        }
+      }
+    } else {
+      const { data, error } = await supabase
+        .from('car_maintenance')
+        .insert({ ...payload, created_by: user })
+        .select()
+        .single()
+      if (error) {
+        setFormError(`Falha ao salvar registro: ${error.message}`)
+        return
+      }
+      if (data) {
+        const newEntries = [data, ...entries]
+        setEntries(newEntries)
+        resetForm()
+        setFormError('')
+        setShowForm(false)
+        await syncCarBillFromEntries(data.date, newEntries)
+      }
     }
   }
 
@@ -250,7 +290,7 @@ export default function CarMaintenance({ user }) {
         <p className="text-xs text-ink/40 mt-0.5">Arraste um registro para a esquerda pra remover.</p>
       </div>
 
-      <FabButton onClick={() => { setFormError(''); setShowForm(true) }} label="Registrar">
+      <FabButton onClick={() => { resetForm(); setFormError(''); setShowForm(true) }} label="Registrar">
         <Plus size={16} />
       </FabButton>
 
@@ -269,18 +309,18 @@ export default function CarMaintenance({ user }) {
 
       {showForm && (
         <Modal
-          title="Novo registro"
-          onClose={() => { setShowForm(false); setFormError('') }}
+          title={editingId ? 'Editar registro' : 'Novo registro'}
+          onClose={() => { setShowForm(false); setFormError(''); resetForm() }}
           footer={
             <div className="flex gap-2">
               <button
-                onClick={() => { setShowForm(false); setFormError('') }}
+                onClick={() => { setShowForm(false); setFormError(''); resetForm() }}
                 className="flex-1 py-2 rounded-full border border-line text-sm"
               >
                 Cancelar
               </button>
-              <button onClick={addEntry} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
-                Salvar registro
+              <button onClick={saveEntry} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+                {editingId ? 'Salvar alterações' : 'Salvar registro'}
               </button>
             </div>
           }
@@ -382,7 +422,17 @@ export default function CarMaintenance({ user }) {
                       </p>
                     </div>
                   </div>
-                  <span className="text-sm text-ink shrink-0">R$ {Number(entry.value).toFixed(2)}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openEditForm(entry) }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      aria-label="Editar registro"
+                      className="p-1.5 text-ink/30 hover:text-ink/60 rounded-full"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <span className="text-sm text-ink">R$ {Number(entry.value).toFixed(2)}</span>
+                  </div>
                 </div>
               </li>
             )

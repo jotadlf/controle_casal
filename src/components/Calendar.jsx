@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, Trash2, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { refreshAppBadge } from '../lib/badge'
 import Modal from './Modal'
@@ -45,6 +45,7 @@ export default function CalendarView({ user }) {
   const [formError, setFormError] = useState('')
   const [form, setForm] = useState({ title: '', description: '', date: '', time: '', endTime: '' })
   const [activeEventId, setActiveEventId] = useState(null)
+  const [editingEventId, setEditingEventId] = useState(null)
   const [now, setNow] = useState(() => new Date())
   const timelineRef = useRef(null)
 
@@ -120,11 +121,26 @@ export default function CalendarView({ user }) {
 
   function openNewEventForm() {
     setFormError('')
+    setEditingEventId(null)
     setForm({ title: '', description: '', date: selectedDate || todayKey, time: '', endTime: '' })
     setShowForm(true)
   }
 
-  async function addEvent() {
+  function openEditEventForm(ev) {
+    setFormError('')
+    setEditingEventId(ev.id)
+    setForm({
+      title: ev.title,
+      description: ev.description || '',
+      date: ev.event_date,
+      time: ev.event_time ? ev.event_time.slice(0, 5) : '',
+      endTime: ev.event_end_time ? ev.event_end_time.slice(0, 5) : '',
+    })
+    setActiveEventId(null)
+    setShowForm(true)
+  }
+
+  async function saveEvent() {
     if (!form.title.trim()) {
       setFormError('Informe o título do compromisso.')
       return
@@ -137,28 +153,45 @@ export default function CalendarView({ user }) {
       setFormError('A hora de término deve ser depois do início.')
       return
     }
-    const { data, error } = await supabase
-      .from('calendar_events')
-      .insert({
-        title: form.title.trim(),
-        description: form.description.trim() || null,
-        event_date: form.date,
-        event_time: form.time || null,
-        event_end_time: form.time ? form.endTime || null : null,
-        created_by: user,
-      })
-      .select()
-      .single()
-    if (error) {
-      setFormError(`Falha ao salvar: ${error.message}`)
-      return
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      event_date: form.date,
+      event_time: form.time || null,
+      event_end_time: form.time ? form.endTime || null : null,
     }
-    if (data) {
-      setEvents((prev) => [...prev, data])
-      setShowForm(false)
-      setFormError('')
-      setSelectedDate(data.event_date)
-      if (data.event_date === todayKey) refreshAppBadge(user)
+
+    if (editingEventId) {
+      const { data, error } = await supabase.from('calendar_events').update(payload).eq('id', editingEventId).select().single()
+      if (error) {
+        setFormError(`Falha ao salvar: ${error.message}`)
+        return
+      }
+      if (data) {
+        setEvents((prev) => prev.map((e) => (e.id === data.id ? data : e)))
+        setShowForm(false)
+        setFormError('')
+        setEditingEventId(null)
+        setSelectedDate(data.event_date)
+        if (data.event_date === todayKey) refreshAppBadge(user)
+      }
+    } else {
+      const { data, error } = await supabase
+        .from('calendar_events')
+        .insert({ ...payload, created_by: user })
+        .select()
+        .single()
+      if (error) {
+        setFormError(`Falha ao salvar: ${error.message}`)
+        return
+      }
+      if (data) {
+        setEvents((prev) => [...prev, data])
+        setShowForm(false)
+        setFormError('')
+        setSelectedDate(data.event_date)
+        if (data.event_date === todayKey) refreshAppBadge(user)
+      }
     }
   }
 
@@ -349,13 +382,22 @@ export default function CalendarView({ user }) {
                                 {timeLabel}
                                 {ev.created_by ? ` · por ${ev.created_by}` : ''}
                               </span>
-                              <button
-                                onClick={() => removeEvent(ev.id)}
-                                aria-label="Excluir compromisso"
-                                className="p-1 text-coral hover:bg-coral-light rounded-full"
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => openEditEventForm(ev)}
+                                  aria-label="Editar compromisso"
+                                  className="p-1 text-ink/40 hover:bg-ink/5 rounded-full"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  onClick={() => removeEvent(ev.id)}
+                                  aria-label="Excluir compromisso"
+                                  className="p-1 text-coral hover:bg-coral-light rounded-full"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -378,10 +420,11 @@ export default function CalendarView({ user }) {
 
       {showForm && (
         <Modal
-          title="Novo compromisso"
+          title={editingEventId ? 'Editar compromisso' : 'Novo compromisso'}
           onClose={() => {
             setShowForm(false)
             setFormError('')
+            setEditingEventId(null)
           }}
           footer={
             <div className="flex gap-2">
@@ -389,13 +432,14 @@ export default function CalendarView({ user }) {
                 onClick={() => {
                   setShowForm(false)
                   setFormError('')
+                  setEditingEventId(null)
                 }}
                 className="flex-1 py-2 rounded-full border border-line text-sm"
               >
                 Cancelar
               </button>
-              <button onClick={addEvent} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
-                Salvar
+              <button onClick={saveEvent} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+                {editingEventId ? 'Salvar alterações' : 'Salvar'}
               </button>
             </div>
           }

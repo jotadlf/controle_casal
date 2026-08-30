@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Check, Trash2, X } from 'lucide-react'
+import { Plus, Check, Trash2, X, Pencil } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { analyzeItem, urgencyLabel } from '../lib/predict'
 import { currentReferenceMonth } from '../lib/bills'
@@ -23,6 +23,8 @@ export default function ShoppingList({ user }) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showAddInput, setShowAddInput] = useState(false)
   const [alert, setAlert] = useState(null)
+  const [editingItemId, setEditingItemId] = useState(null)
+  const [editName, setEditName] = useState('')
   const inputContainerRef = useRef(null)
   const addInputRef = useRef(null)
 
@@ -174,6 +176,29 @@ export default function ShoppingList({ user }) {
     setNewName('')
     setShowSuggestions(false)
     setShowAddInput(false)
+  }
+
+  function openEditItem(item) {
+    setEditingItemId(item.id)
+    setEditName(item.name)
+  }
+
+  async function saveEditItem() {
+    if (!editName.trim() || !editingItemId) {
+      setEditingItemId(null)
+      return
+    }
+    const { data, error } = await supabase
+      .from('shopping_items')
+      .update({ name: editName.trim() })
+      .eq('id', editingItemId)
+      .select()
+      .single()
+    if (!error && data) {
+      setItems((prev) => prev.map((i) => (i.id === data.id ? data : i)))
+    }
+    setEditingItemId(null)
+    setEditName('')
   }
 
   async function removeItem(id) {
@@ -499,11 +524,44 @@ export default function ShoppingList({ user }) {
                       })()}
                     </div>
                   </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openEditItem(item) }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    aria-label="Editar item"
+                    className="shrink-0 p-2 text-ink/30 hover:text-ink/60 rounded-full"
+                  >
+                    <Pencil size={14} />
+                  </button>
                 </div>
               </li>
             )
           })}
         </ul>
+      )}
+
+      {editingItemId && (
+        <Modal
+          title="Editar item"
+          onClose={() => setEditingItemId(null)}
+          footer={
+            <div className="flex gap-2">
+              <button onClick={() => setEditingItemId(null)} className="flex-1 py-2 rounded-full border border-line text-sm">
+                Cancelar
+              </button>
+              <button onClick={saveEditItem} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+                Salvar
+              </button>
+            </div>
+          }
+        >
+          <input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && saveEditItem()}
+            className="w-full rounded-full border border-line px-4 py-2 text-sm"
+            autoFocus
+          />
+        </Modal>
       )}
 
       {purchaseTarget && (
