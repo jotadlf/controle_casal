@@ -21,6 +21,18 @@ export function currentReferenceMonth() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
+export function monthsBetween(startMonth, refMonth) {
+  const [sy, sm] = startMonth.split('-').map(Number)
+  const [ry, rm] = refMonth.split('-').map(Number)
+  return (ry - sy) * 12 + (rm - sm)
+}
+
+// Em qual parcela a conta está no mês de referência (1-indexed).
+export function installmentNumber(bill, refMonth) {
+  if (!bill.start_month) return null
+  return monthsBetween(bill.start_month, refMonth) + 1
+}
+
 export function urgencyColor(daysLeft, paid) {
   if (paid) return 'gray'
   if (daysLeft < 0) return 'coral'

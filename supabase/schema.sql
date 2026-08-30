@@ -35,3 +35,23 @@ create index if not exists calendar_events_event_date_idx on calendar_events (ev
 -- o intervalo entre event_time e event_end_time na agenda do dia.
 alter table calendar_events
   add column if not exists event_end_time time;
+
+-- Recorrência de contas: uma conta pode se repetir indefinidamente (ex:
+-- aluguel) ou ser parcelada por uma quantidade fixa de meses (ex:
+-- financiamento em 12x). start_month marca o mês de referência da 1ª
+-- parcela/ocorrência e é usado para calcular em qual parcela a conta está.
+alter table bills
+  add column if not exists recurrence_type text not null default 'recurring',
+  add column if not exists installments_total integer,
+  add column if not exists start_month date not null default date_trunc('month', now())::date;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'bills_recurrence_type_check'
+  ) then
+    alter table bills
+      add constraint bills_recurrence_type_check
+      check (recurrence_type in ('recurring', 'installment'));
+  end if;
+end $$;

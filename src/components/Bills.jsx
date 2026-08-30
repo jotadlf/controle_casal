@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Trash2, Check, CheckCircle2, Circle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
-import { nextDueDate, daysUntil, currentReferenceMonth, urgencyColor } from '../lib/bills'
+import { nextDueDate, daysUntil, currentReferenceMonth, urgencyColor, installmentNumber } from '../lib/bills'
 import { EmptyState } from './ShoppingList'
 import Modal from './Modal'
 import FabButton from './FabButton'
@@ -13,7 +13,14 @@ export default function Bills({ user }) {
   const [bills, setBills] = useState([])
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ name: '', category: 'Outro', amount: '', due_day: '' })
+  const [form, setForm] = useState({
+    name: '',
+    category: 'Outro',
+    amount: '',
+    due_day: '',
+    recurrence_type: 'recurring',
+    installments_total: '',
+  })
   const [formError, setFormError] = useState('')
   const [showForm, setShowForm] = useState(false)
 
@@ -40,7 +47,23 @@ export default function Bills({ user }) {
       supabase.from('bills').select('*').eq('active', true).order('due_day'),
       supabase.from('bill_payments').select('*').eq('reference_month', refMonth),
     ])
-    setBills(billsData || [])
+    const allBills = billsData || []
+    const finishedIds = []
+    const currentBills = allBills.filter((bill) => {
+      if (bill.recurrence_type !== 'installment') return true
+      const number = installmentNumber(bill, refMonth)
+      if (number > bill.installments_total) {
+        finishedIds.push(bill.id)
+        return false
+      }
+      return true
+    })
+
+    if (finishedIds.length) {
+      supabase.from('bills').update({ active: false }).in('id', finishedIds)
+    }
+
+    setBills(currentBills)
     setPayments(paymentsData || [])
     setLoading(false)
   }
@@ -50,11 +73,16 @@ export default function Bills({ user }) {
   }, [])
 
   const rows = useMemo(() => {
+    const refMonth = currentReferenceMonth()
     return bills.map((bill) => {
       const payment = payments.find((p) => p.bill_id === bill.id)
       const due = nextDueDate(bill.due_day)
       const left = daysUntil(due)
-      return { ...bill, payment, due, left }
+      const installment =
+        bill.recurrence_type === 'installment'
+          ? { number: installmentNumber(bill, refMonth), total: bill.installments_total }
+          : null
+      return { ...bill, payment, due, left, installment }
     }).sort((a, b) => {
       if (!!a.payment?.paid !== !!b.payment?.paid) return a.payment?.paid ? 1 : -1
       return a.left - b.left
@@ -66,6 +94,11 @@ export default function Bills({ user }) {
       setFormError('Informe o nome e o dia de vencimento.')
       return
     }
+    const isInstallment = form.recurrence_type === 'installment'
+    if (isInstallment && (!form.installments_total || Number(form.installments_total) < 1)) {
+      setFormError('Informe a quantidade de parcelas.')
+      return
+    }
     const { data, error } = await supabase
       .from('bills')
       .insert({
@@ -74,6 +107,9 @@ export default function Bills({ user }) {
         amount: form.amount ? Number(form.amount) : null,
         due_day: Number(form.due_day),
         active: true,
+        recurrence_type: form.recurrence_type,
+        installments_total: isInstallment ? Number(form.installments_total) : null,
+        start_month: currentReferenceMonth(),
       })
       .select()
       .single()
@@ -83,7 +119,7 @@ export default function Bills({ user }) {
     }
     if (data) {
       setBills((prev) => [...prev, data])
-      setForm({ name: '', category: 'Outro', amount: '', due_day: '' })
+      setForm({ name: '', category: 'Outro', amount: '', due_day: '', recurrence_type: 'recurring', installments_total: '' })
       setFormError('')
       setShowForm(false)
     }
@@ -171,7 +207,7 @@ export default function Bills({ user }) {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display font-semibold text-xl text-ink">Contas recorrentes</h2>
+        <h2 className="font-display font-semibold text-xl text-ink">Contas</h2>
         <p className="text-sm text-ink/60">Vencimentos do mês atual.</p>
         <p className="text-sm text-teal font-semibold">Gasto total do mês: {formatCurrency(totalSpentThisMonth)}</p>
         <p className="text-xs text-ink/40 mt-0.5">Arraste uma conta para a direita pra marcar como paga, para a esquerda pra remover.</p>
@@ -239,6 +275,35 @@ export default function Bills({ user }) {
                 className="flex-1 rounded-full border border-line px-3 py-2 text-sm"
               />
             </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setForm({ ...form, recurrence_type: 'recurring' }); if (formError) setFormError('') }}
+                className={`flex-1 py-2 rounded-full border text-sm ${form.recurrence_type === 'recurring' ? 'bg-ink text-white border-ink' : 'border-line text-ink/60'}`}
+              >
+                Recorrente
+              </button>
+              <button
+                type="button"
+                onClick={() => { setForm({ ...form, recurrence_type: 'installment' }); if (formError) setFormError('') }}
+                className={`flex-1 py-2 rounded-full border text-sm ${form.recurrence_type === 'installment' ? 'bg-ink text-white border-ink' : 'border-line text-ink/60'}`}
+              >
+                Parcelada
+              </button>
+            </div>
+            {form.recurrence_type === 'installment' && (
+              <input
+                type="number"
+                placeholder="Quantas parcelas"
+                min="1"
+                value={form.installments_total}
+                onChange={(e) => {
+                  setForm({ ...form, installments_total: e.target.value })
+                  if (formError) setFormError('')
+                }}
+                className={`w-full rounded-full border px-4 py-2 text-sm ${formError ? 'border-coral' : 'border-line'}`}
+              />
+            )}
             {formError && <p className="text-xs text-coral px-1">{formError}</p>}
           </div>
         </Modal>
@@ -291,6 +356,11 @@ export default function Bills({ user }) {
                         {bill.category}
                         {bill.amount ? ` · R$ ${Number(bill.amount).toFixed(2)}` : ''}
                       </span>
+                      {bill.installment && (
+                        <span className="text-xs px-2 py-0.5 rounded-full border border-line text-ink/50">
+                          Parcela {bill.installment.number}/{bill.installment.total}
+                        </span>
+                      )}
                       <span className={`text-xs px-2 py-0.5 rounded-full border ${colorMap[color]}`}>
                         {paid
                           ? 'Pago'
