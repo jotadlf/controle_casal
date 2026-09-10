@@ -5,8 +5,6 @@ import { loadTasks, sortByPriorityThenId } from '../lib/tasks'
 import Modal from './Modal'
 import FabButton from './FabButton'
 
-const COLUMN_GAP = 12 // px, precisa bater com o gap-3 do grid de colunas abaixo
-
 function currentWeekRange() {
   const now = new Date()
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
@@ -16,20 +14,20 @@ function currentWeekRange() {
   return { start, end }
 }
 
-function Card({ req, direction, dragX, isActiveDrag, onDragStart, onDragMove, onDragEnd, onDragCancel, onRemove }) {
+function Card({ req, dx, dy, isActiveDrag, onDragStart, onDragMove, onDragEnd, onDragCancel, onRemove }) {
   const isDone = req.status === 'concluido'
   return (
-    <li className={`relative rounded-card ${isActiveDrag ? 'z-20' : ''}`}>
+    <li className={`relative rounded-card ${isActiveDrag ? 'z-30' : ''}`}>
       <div
-        className={`relative bg-card border border-line rounded-card px-3 py-2.5 ${isActiveDrag ? 'shadow-lg' : ''}`}
+        className={`relative bg-card border border-line rounded-card px-3 py-2.5 ${isActiveDrag ? 'shadow-xl' : ''}`}
         style={{
-          transform: `translateX(${dragX}px)`,
+          transform: `translate(${dx}px, ${dy}px) ${isActiveDrag ? 'scale(1.04)' : 'scale(1)'}`,
           transition: isActiveDrag ? 'none' : 'transform 0.2s ease',
-          touchAction: 'pan-y',
+          touchAction: 'none',
         }}
         onPointerDown={(e) => onDragStart(e, req.id)}
-        onPointerMove={(e) => onDragMove(e, req.id, direction)}
-        onPointerUp={(e) => onDragEnd(e, req.id, req, direction)}
+        onPointerMove={(e) => onDragMove(e, req.id)}
+        onPointerUp={(e) => onDragEnd(e, req.id, req)}
         onPointerCancel={onDragCancel}
       >
         <div className="flex items-start justify-between gap-1">
@@ -107,13 +105,16 @@ export default function Kanban({ user }) {
   }
 
   async function updateStatus(req, status) {
-    const { data } = await supabase
+    const completedAt = status === 'concluido' ? new Date().toISOString() : null
+    // atualiza local na hora (arraste fica instantâneo) e reconcilia com o banco depois
+    setRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, status, completed_at: completedAt } : r)))
+    const { data, error } = await supabase
       .from('repair_requests')
-      .update({ status, completed_at: status === 'concluido' ? new Date().toISOString() : null })
+      .update({ status, completed_at: completedAt })
       .eq('id', req.id)
       .select()
       .single()
-    if (data) setRequests((prev) => prev.map((r) => (r.id === data.id ? data : r)))
+    if (!error && data) setRequests((prev) => prev.map((r) => (r.id === data.id ? data : r)))
   }
 
   async function removeTask(id) {
@@ -121,48 +122,49 @@ export default function Kanban({ user }) {
     setRequests((prev) => prev.filter((r) => r.id !== id))
   }
 
-  // arrastar card: o card acompanha o dedo/mouse até a coluna vizinha.
-  // passar da metade do caminho muda o status; soltar antes disso volta pro lugar.
-  const dragStartX = useRef(0)
-  const [drag, setDrag] = useState({ id: null, x: 0, dragging: false, distance: 0 })
+  // arrastar card: solto de verdade, acompanha o ponteiro em qualquer direção.
+  // soltar do lado da coluna oposta muda o status; soltar do lado de origem cancela.
+  const gridRef = useRef(null)
+  const dragStart = useRef({ x: 0, y: 0 })
+  const [drag, setDrag] = useState({ id: null, dx: 0, dy: 0, dragging: false, hoverColumn: null })
+
+  function columnAt(clientX) {
+    if (!gridRef.current) return null
+    const rect = gridRef.current.getBoundingClientRect()
+    return clientX < rect.left + rect.width / 2 ? 'pendente' : 'concluido'
+  }
 
   function handleDragStart(e, id) {
-    dragStartX.current = e.clientX
-    const distance = e.currentTarget.getBoundingClientRect().width + COLUMN_GAP
-    setDrag({ id, x: 0, dragging: true, distance })
+    dragStart.current = { x: e.clientX, y: e.clientY }
+    setDrag({ id, dx: 0, dy: 0, dragging: true, hoverColumn: null })
     e.currentTarget.setPointerCapture(e.pointerId)
   }
 
-  function handleDragMove(e, id, direction) {
-    const clientX = e.clientX
+  function handleDragMove(e, id) {
+    const { clientX, clientY } = e
     setDrag((d) => {
       if (!d.dragging || d.id !== id) return d
-      const rawDx = clientX - dragStartX.current
-      const dx = direction === 'right'
-        ? Math.min(Math.max(rawDx, 0), d.distance)
-        : Math.max(Math.min(rawDx, 0), -d.distance)
-      return { ...d, x: dx }
+      return {
+        ...d,
+        dx: clientX - dragStart.current.x,
+        dy: clientY - dragStart.current.y,
+        hoverColumn: columnAt(clientX),
+      }
     })
   }
 
-  function handleDragEnd(e, id, req, direction) {
-    setDrag((d) => {
-      if (d.id !== id || !d.dragging) return d
-      const past = Math.abs(d.x) > d.distance / 2
-      if (past) {
-        const target = direction === 'right' ? d.distance : -d.distance
-        setTimeout(() => {
-          updateStatus(req, direction === 'right' ? 'concluido' : 'pendente')
-          setDrag({ id: null, x: 0, dragging: false, distance: 0 })
-        }, 180)
-        return { ...d, x: target, dragging: false }
-      }
-      return { id: null, x: 0, dragging: false, distance: 0 }
-    })
+  function handleDragEnd(e, id, req) {
+    if (drag.id !== id || !drag.dragging) return
+    const originColumn = req.status === 'concluido' ? 'concluido' : 'pendente'
+    const target = drag.hoverColumn
+    setDrag({ id: null, dx: 0, dy: 0, dragging: false, hoverColumn: null })
+    if (target && target !== originColumn) {
+      updateStatus(req, target)
+    }
   }
 
   function handleDragCancel() {
-    setDrag({ id: null, x: 0, dragging: false, distance: 0 })
+    setDrag({ id: null, dx: 0, dy: 0, dragging: false, hoverColumn: null })
   }
 
   const pending = [...requests.filter((r) => r.status !== 'concluido')].sort(sortByPriorityThenId)
@@ -177,9 +179,10 @@ export default function Kanban({ user }) {
       .sort(sortByPriorityThenId)
   })()
 
-  const pastThreshold = drag.dragging && drag.distance > 0 && Math.abs(drag.x) > drag.distance / 2
-  const highlightDone = pastThreshold && pending.some((r) => r.id === drag.id)
-  const highlightPending = pastThreshold && done.some((r) => r.id === drag.id)
+  const draggedReq = requests.find((r) => r.id === drag.id)
+  const originColumn = draggedReq ? (draggedReq.status === 'concluido' ? 'concluido' : 'pendente') : null
+  const highlightPending = drag.dragging && drag.hoverColumn === 'pendente' && originColumn !== 'pendente'
+  const highlightDone = drag.dragging && drag.hoverColumn === 'concluido' && originColumn !== 'concluido'
 
   return (
     <div className="space-y-4">
@@ -192,7 +195,7 @@ export default function Kanban({ user }) {
       {loading ? (
         <p className="text-sm text-ink/50">Carregando...</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div ref={gridRef} className="grid grid-cols-2 gap-3">
           <div className={`space-y-2 rounded-card p-1.5 transition-colors ${highlightPending ? 'bg-ink/5' : ''}`}>
             <p className="text-xs font-medium text-ink/50 px-1">Pendente ({pending.length})</p>
             {pending.length === 0 ? (
@@ -203,8 +206,8 @@ export default function Kanban({ user }) {
                   <Card
                     key={req.id}
                     req={req}
-                    direction="right"
-                    dragX={drag.id === req.id ? drag.x : 0}
+                    dx={drag.id === req.id ? drag.dx : 0}
+                    dy={drag.id === req.id ? drag.dy : 0}
                     isActiveDrag={drag.id === req.id && drag.dragging}
                     onDragStart={handleDragStart}
                     onDragMove={handleDragMove}
@@ -226,8 +229,8 @@ export default function Kanban({ user }) {
                   <Card
                     key={req.id}
                     req={req}
-                    direction="left"
-                    dragX={drag.id === req.id ? drag.x : 0}
+                    dx={drag.id === req.id ? drag.dx : 0}
+                    dy={drag.id === req.id ? drag.dy : 0}
                     isActiveDrag={drag.id === req.id && drag.dragging}
                     onDragStart={handleDragStart}
                     onDragMove={handleDragMove}
