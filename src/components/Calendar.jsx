@@ -502,7 +502,7 @@ export default function CalendarView({ user }) {
       {showWeekAgenda && (
         <WeekAgenda
           user={user}
-          initialDate={selectedDateAsDate || monthDate}
+          initialDate={selectedDateAsDate || new Date()}
           onClose={() => { setShowWeekAgenda(false); loadEvents() }}
         />
       )}

@@ -106,6 +106,33 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
   const dragStart = useRef({ x: 0, y: 0 })
   const [drag, setDrag] = useState({ id: null, dx: 0, dy: 0, dragging: false, moved: false })
 
+  // ao trocar de semana (inclusive na primeira renderização), rola a grade
+  // pra deixar o dia e o horário atuais em evidência, em vez de abrir
+  // sempre no topo (00h) lá na esquerda.
+  const scrollRef = useRef(null)
+  useEffect(() => {
+    if (!scrollRef.current) return
+    const startKey = toDateKey(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate())
+    const last = days[6]
+    const endKey = toDateKey(last.getFullYear(), last.getMonth(), last.getDate())
+    const todayKey = toDateKey(now.getFullYear(), now.getMonth(), now.getDate())
+    const todayInWeek = todayKey >= startKey && todayKey <= endKey
+
+    const targetHour = todayInWeek ? now.getHours() : 7
+    scrollRef.current.scrollTop = Math.max(targetHour - 2, 0) * HOUR_HEIGHT
+
+    const col = todayInWeek ? dayColumnRefs.current[todayKey] : null
+    if (col) {
+      const containerRect = scrollRef.current.getBoundingClientRect()
+      const colRect = col.getBoundingClientRect()
+      const targetLeft = scrollRef.current.scrollLeft + (colRect.left - containerRect.left) - HOUR_COL_WIDTH
+      scrollRef.current.scrollLeft = Math.max(targetLeft, 0)
+    } else {
+      scrollRef.current.scrollLeft = 0
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStart])
+
   function handleDragStart(e, id) {
     dragStart.current = { x: e.clientX, y: e.clientY }
     setDrag({ id, dx: 0, dy: 0, dragging: true, moved: false })
@@ -266,7 +293,7 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
 
       {loading && <p className="text-xs text-ink/40 px-4 py-1">Carregando...</p>}
 
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollRef} className="flex-1 overflow-auto">
         <div className="flex w-full" style={{ minWidth: HOUR_COL_WIDTH + 7 * DAY_COL_WIDTH }}>
           <div className="sticky left-0 z-20 bg-base shrink-0" style={{ width: HOUR_COL_WIDTH }}>
             <div className="sticky top-0 z-30 bg-base h-12 border-b border-line" />
