@@ -267,7 +267,7 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
       {loading && <p className="text-xs text-ink/40 px-4 py-1">Carregando...</p>}
 
       <div className="flex-1 overflow-auto">
-        <div className="flex" style={{ minWidth: HOUR_COL_WIDTH + 7 * DAY_COL_WIDTH }}>
+        <div className="flex w-full" style={{ minWidth: HOUR_COL_WIDTH + 7 * DAY_COL_WIDTH }}>
           <div className="sticky left-0 z-20 bg-base shrink-0" style={{ width: HOUR_COL_WIDTH }}>
             <div className="sticky top-0 z-30 bg-base h-12 border-b border-line" />
             <div className="relative" style={{ height: HOUR_HEIGHT * 24 }}>
@@ -284,7 +284,7 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
             const isToday = dateKey === todayKey
             const dayEvents = eventsByDate[dateKey] || []
             return (
-              <div key={dateKey} className="shrink-0 border-l border-line" style={{ width: DAY_COL_WIDTH }}>
+              <div key={dateKey} className="flex-1 border-l border-line" style={{ minWidth: DAY_COL_WIDTH }}>
                 <div className="sticky top-0 z-10 bg-base h-12 border-b border-line flex flex-col items-center justify-center gap-0.5">
                   <span className="text-[10px] text-ink/40">{WEEKDAY_LABELS[date.getDay()]}</span>
                   <span className={`text-xs w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-ink text-base font-medium' : 'text-ink/80'}`}>
