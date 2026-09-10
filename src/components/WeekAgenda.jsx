@@ -228,8 +228,18 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
   }
 
   // --- criar / editar ---
-  function openNewEvent(dateKey) {
-    setEventModal({ id: null, form: { title: '', description: '', date: dateKey, time: '', endTime: '' } })
+  function openNewEvent(dateKey, time = '') {
+    setEventModal({ id: null, form: { title: '', description: '', date: dateKey, time, endTime: '' } })
+  }
+
+  // dois cliques num horário vazio da grade já abre o formulário com
+  // aquele dia e horário preenchidos (arredondado pros 15min mais próximos)
+  function handleDayDoubleClick(e, dateKey) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const relativeY = e.clientY - rect.top
+    let minutes = Math.round((relativeY / HOUR_HEIGHT) * 60 / SNAP_MINUTES) * SNAP_MINUTES
+    minutes = Math.max(0, Math.min(minutes, 24 * 60 - SNAP_MINUTES))
+    openNewEvent(dateKey, minutesToTime(minutes).slice(0, 5))
   }
 
   function openEditEvent(ev) {
@@ -291,7 +301,9 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
         </button>
       </div>
 
-      {loading && <p className="text-xs text-ink/40 px-4 py-1">Carregando...</p>}
+      <p className="text-xs text-ink/40 px-4 py-1">
+        {loading ? 'Carregando...' : 'Dois cliques num horário vazio criam um compromisso. Arraste um compromisso pra mudar de dia/horário.'}
+      </p>
 
       <div ref={scrollRef} className="flex-1 overflow-auto">
         <div className="flex w-full" style={{ minWidth: HOUR_COL_WIDTH + 7 * DAY_COL_WIDTH }}>
@@ -320,8 +332,9 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
                 </div>
                 <div
                   ref={(el) => { dayColumnRefs.current[dateKey] = el }}
-                  className="relative"
+                  className="relative cursor-pointer"
                   style={{ height: HOUR_HEIGHT * 24 }}
+                  onDoubleClick={(e) => handleDayDoubleClick(e, dateKey)}
                 >
                   {Array.from({ length: 24 }).map((_, h) => (
                     <div key={h} className="absolute left-0 right-0 border-t border-line/50" style={{ top: h * HOUR_HEIGHT }} />
