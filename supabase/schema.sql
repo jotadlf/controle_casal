@@ -55,3 +55,21 @@ begin
       check (recurrence_type in ('recurring', 'installment'));
   end if;
 end $$;
+
+-- Simplificação da lista de compras: removidos preço/quantidade/unidade e
+-- sessão de compras (mercado + total + criação automática de conta), já
+-- que o frontend não usa mais nada disso. Remove também on_list, campo
+-- vestigial que não é mais referenciado em lugar nenhum.
+-- ATENÇÃO: isso apaga permanentemente qualquer preço/quantidade/unidade e
+-- sessão de compras já registrados. Não afeta as contas já criadas em
+-- "bills"/"bill_payments" (incluindo as que vieram de "Compras <loja>").
+alter table shopping_purchases
+  drop column if exists session_id,
+  drop column if exists price,
+  drop column if exists quantity,
+  drop column if exists unit;
+
+drop table if exists shopping_sessions;
+
+alter table shopping_items
+  drop column if exists on_list;
