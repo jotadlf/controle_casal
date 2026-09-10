@@ -5,7 +5,53 @@ import { loadTasks, sortByPriorityThenId } from '../lib/tasks'
 import Modal from './Modal'
 import FabButton from './FabButton'
 
-const DRAG_THRESHOLD = 88
+const COLUMN_GAP = 12 // px, precisa bater com o gap-3 do grid de colunas abaixo
+
+function currentWeekRange() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 7)
+  return { start, end }
+}
+
+function Card({ req, direction, dragX, isActiveDrag, onDragStart, onDragMove, onDragEnd, onDragCancel, onRemove }) {
+  const isDone = req.status === 'concluido'
+  return (
+    <li className={`relative rounded-card ${isActiveDrag ? 'z-20' : ''}`}>
+      <div
+        className={`relative bg-card border border-line rounded-card px-3 py-2.5 ${isActiveDrag ? 'shadow-lg' : ''}`}
+        style={{
+          transform: `translateX(${dragX}px)`,
+          transition: isActiveDrag ? 'none' : 'transform 0.2s ease',
+          touchAction: 'pan-y',
+        }}
+        onPointerDown={(e) => onDragStart(e, req.id)}
+        onPointerMove={(e) => onDragMove(e, req.id, direction)}
+        onPointerUp={(e) => onDragEnd(e, req.id, req, direction)}
+        onPointerCancel={onDragCancel}
+      >
+        <div className="flex items-start justify-between gap-1">
+          <p className={`text-sm font-medium truncate flex-1 min-w-0 ${isDone ? 'text-ink/40 line-through' : 'text-ink'}`}>
+            {req.title}
+          </p>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove(req.id) }}
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-label="Remover tarefa"
+            className="shrink-0 p-1 -m-1 text-ink/25 hover:text-coral rounded-full"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+        {req.priority === 'alta' && !isDone && (
+          <AlertCircle size={12} className="text-coral mt-1" aria-label="Prioridade alta" />
+        )}
+      </div>
+    </li>
+  )
+}
 
 export default function Kanban({ user }) {
   const [requests, setRequests] = useState([])
@@ -75,93 +121,69 @@ export default function Kanban({ user }) {
     setRequests((prev) => prev.filter((r) => r.id !== id))
   }
 
+  // arrastar card: o card acompanha o dedo/mouse até a coluna vizinha.
+  // passar da metade do caminho muda o status; soltar antes disso volta pro lugar.
   const dragStartX = useRef(0)
-  const [drag, setDrag] = useState({ id: null, x: 0, dragging: false })
+  const [drag, setDrag] = useState({ id: null, x: 0, dragging: false, distance: 0 })
 
   function handleDragStart(e, id) {
     dragStartX.current = e.clientX
-    setDrag({ id, x: 0, dragging: true })
+    const distance = e.currentTarget.getBoundingClientRect().width + COLUMN_GAP
+    setDrag({ id, x: 0, dragging: true, distance })
     e.currentTarget.setPointerCapture(e.pointerId)
   }
 
   function handleDragMove(e, id, direction) {
-    if (!drag.dragging || drag.id !== id) return
-    const rawDx = e.clientX - dragStartX.current
-    // pendente só arrasta pra direita (concluir), concluído só pra esquerda (reabrir)
-    const dx = direction === 'right' ? Math.max(rawDx, 0) : Math.min(rawDx, 0)
-    setDrag((d) => (d.id === id ? { ...d, x: dx } : d))
+    const clientX = e.clientX
+    setDrag((d) => {
+      if (!d.dragging || d.id !== id) return d
+      const rawDx = clientX - dragStartX.current
+      const dx = direction === 'right'
+        ? Math.min(Math.max(rawDx, 0), d.distance)
+        : Math.max(Math.min(rawDx, 0), -d.distance)
+      return { ...d, x: dx }
+    })
   }
 
   function handleDragEnd(e, id, req, direction) {
-    if (drag.id !== id) return
-    const dx = drag.x
-    if (!drag.dragging) return
-
-    const triggered = direction === 'right' ? dx > DRAG_THRESHOLD : dx < -DRAG_THRESHOLD
-    if (triggered) {
-      setDrag({ id, x: direction === 'right' ? 600 : -600, dragging: false })
-      setTimeout(() => {
-        updateStatus(req, direction === 'right' ? 'concluido' : 'pendente')
-        setDrag({ id: null, x: 0, dragging: false })
-      }, 180)
-      return
-    }
-
-    setDrag({ id: null, x: 0, dragging: false })
+    setDrag((d) => {
+      if (d.id !== id || !d.dragging) return d
+      const past = Math.abs(d.x) > d.distance / 2
+      if (past) {
+        const target = direction === 'right' ? d.distance : -d.distance
+        setTimeout(() => {
+          updateStatus(req, direction === 'right' ? 'concluido' : 'pendente')
+          setDrag({ id: null, x: 0, dragging: false, distance: 0 })
+        }, 180)
+        return { ...d, x: target, dragging: false }
+      }
+      return { id: null, x: 0, dragging: false, distance: 0 }
+    })
   }
 
-  function Card({ req, direction }) {
-    const isDragging = drag.id === req.id
-    const isActiveDrag = isDragging && drag.dragging
-    const dragX = isDragging ? drag.x : 0
-    const isDone = req.status === 'concluido'
-
-    return (
-      <li className="relative rounded-card overflow-hidden">
-        <div className={`absolute inset-0 flex items-center px-3 ${direction === 'right' ? 'justify-end' : 'justify-start'}`}>
-          <span className={`text-[10px] font-medium ${direction === 'right' ? 'text-teal-dark' : 'text-coral'} transition-opacity ${isActiveDrag ? 'opacity-100' : 'opacity-0'}`}>
-            {direction === 'right' ? 'Concluir' : 'Reabrir'}
-          </span>
-        </div>
-        <div
-          className="relative bg-card border border-line rounded-card px-3 py-2.5"
-          style={{
-            transform: `translateX(${dragX}px)`,
-            transition: isActiveDrag ? 'none' : 'transform 0.2s ease',
-            touchAction: 'pan-y',
-          }}
-          onPointerDown={(e) => handleDragStart(e, req.id)}
-          onPointerMove={(e) => handleDragMove(e, req.id, direction)}
-          onPointerUp={(e) => handleDragEnd(e, req.id, req, direction)}
-          onPointerCancel={() => setDrag({ id: null, x: 0, dragging: false })}
-        >
-          <div className="flex items-start justify-between gap-1">
-            <p className={`text-sm font-medium truncate flex-1 min-w-0 ${isDone ? 'text-ink/40 line-through' : 'text-ink'}`}>
-              {req.title}
-            </p>
-            <button
-              onClick={(e) => { e.stopPropagation(); removeTask(req.id) }}
-              onPointerDown={(e) => e.stopPropagation()}
-              aria-label="Remover tarefa"
-              className="shrink-0 p-1 -m-1 text-ink/25 hover:text-coral rounded-full"
-            >
-              <Trash2 size={12} />
-            </button>
-          </div>
-          {req.priority === 'alta' && !isDone && (
-            <AlertCircle size={12} className="text-coral mt-1" aria-label="Prioridade alta" />
-          )}
-        </div>
-      </li>
-    )
+  function handleDragCancel() {
+    setDrag({ id: null, x: 0, dragging: false, distance: 0 })
   }
 
   const pending = [...requests.filter((r) => r.status !== 'concluido')].sort(sortByPriorityThenId)
-  const done = [...requests.filter((r) => r.status === 'concluido')].sort(sortByPriorityThenId)
+  const done = (() => {
+    const { start, end } = currentWeekRange()
+    return requests
+      .filter((r) => {
+        if (r.status !== 'concluido' || !r.completed_at) return false
+        const completedAt = new Date(r.completed_at)
+        return completedAt >= start && completedAt < end
+      })
+      .sort(sortByPriorityThenId)
+  })()
+
+  const pastThreshold = drag.dragging && drag.distance > 0 && Math.abs(drag.x) > drag.distance / 2
+  const highlightDone = pastThreshold && pending.some((r) => r.id === drag.id)
+  const highlightPending = pastThreshold && done.some((r) => r.id === drag.id)
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-ink/40">Arraste um card pra direita pra concluir, ou pra esquerda (na coluna Concluído) pra reabrir.</p>
+      <p className="text-xs text-ink/40">Arraste um card pra outra coluna pra mudar o status.</p>
 
       <FabButton onClick={() => { setTitle(''); setFormError(''); setShowForm(true) }} label="Nova tarefa">
         <Plus size={16} />
@@ -171,26 +193,48 @@ export default function Kanban({ user }) {
         <p className="text-sm text-ink/50">Carregando...</p>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
+          <div className={`space-y-2 rounded-card p-1.5 transition-colors ${highlightPending ? 'bg-ink/5' : ''}`}>
             <p className="text-xs font-medium text-ink/50 px-1">Pendente ({pending.length})</p>
             {pending.length === 0 ? (
               <p className="text-xs text-ink/30 px-1">Nada por aqui.</p>
             ) : (
               <ul className="space-y-2">
                 {pending.map((req) => (
-                  <Card key={req.id} req={req} direction="right" />
+                  <Card
+                    key={req.id}
+                    req={req}
+                    direction="right"
+                    dragX={drag.id === req.id ? drag.x : 0}
+                    isActiveDrag={drag.id === req.id && drag.dragging}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
+                    onRemove={removeTask}
+                  />
                 ))}
               </ul>
             )}
           </div>
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-ink/50 px-1">Concluído ({done.length})</p>
+          <div className={`space-y-2 rounded-card p-1.5 transition-colors ${highlightDone ? 'bg-teal-light' : ''}`}>
+            <p className="text-xs font-medium text-ink/50 px-1">Concluído esta semana ({done.length})</p>
             {done.length === 0 ? (
               <p className="text-xs text-ink/30 px-1">Nada por aqui.</p>
             ) : (
               <ul className="space-y-2">
                 {done.map((req) => (
-                  <Card key={req.id} req={req} direction="left" />
+                  <Card
+                    key={req.id}
+                    req={req}
+                    direction="left"
+                    dragX={drag.id === req.id ? drag.x : 0}
+                    isActiveDrag={drag.id === req.id && drag.dragging}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
+                    onRemove={removeTask}
+                  />
                 ))}
               </ul>
             )}
