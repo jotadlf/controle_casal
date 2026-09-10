@@ -5,6 +5,12 @@ import { refreshAppBadge } from '../lib/badge'
 import { currentReferenceMonth, installmentNumber } from '../lib/bills'
 import Modal from './Modal'
 import FabButton from './FabButton'
+import Kanban from './Kanban'
+
+const VIEWS = [
+  { key: 'calendario', label: 'Calendário' },
+  { key: 'kanban', label: 'Kanban' },
+]
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 const HOUR_HEIGHT = 48 // px
@@ -35,6 +41,7 @@ function parseTime(t) {
 }
 
 export default function CalendarView({ user }) {
+  const [view, setView] = useState('calendario')
   const [monthDate, setMonthDate] = useState(() => {
     const d = new Date()
     return new Date(d.getFullYear(), d.getMonth(), 1)
@@ -253,6 +260,26 @@ export default function CalendarView({ user }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-center">
+        <div className="inline-flex rounded-full bg-ink/5 p-1">
+          {VIEWS.map((v) => (
+            <button
+              key={v.key}
+              onClick={() => setView(v.key)}
+              className={`px-4 py-1.5 text-sm rounded-full font-medium transition-colors ${
+                view === v.key ? 'bg-ink text-base' : 'text-ink/60 hover:bg-card/50'
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {view === 'kanban' ? (
+        <Kanban user={user} />
+      ) : (
+        <>
       <FabButton onClick={openNewEventForm} label="Novo compromisso">
         <Plus size={16} />
       </FabButton>
@@ -579,6 +606,8 @@ export default function CalendarView({ user }) {
             {formError && <p className="text-xs text-coral px-1">{formError}</p>}
           </div>
         </Modal>
+      )}
+        </>
       )}
     </div>
   )

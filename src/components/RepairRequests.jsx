@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, Check, Archive, X, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { loadTasks, sortByPriorityThenId } from '../lib/tasks'
 import { EmptyState } from './ShoppingList'
 import { USERS } from './UserSwitch'
 import Modal from './Modal'
@@ -43,53 +44,14 @@ export default function Tasks({ user }) {
 
   async function loadAll() {
     setLoading(true)
-    const { data, error } = await supabase.from('repair_requests').select('*').order('id', { ascending: false })
+    const { tasks, error } = await loadTasks()
     if (error) {
       console.error('Falha ao carregar tarefas:', error)
       setRequests([])
       setLoading(false)
       return
     }
-
-    // função utilitária para parsear datas em formatos variados
-    const parseDue = (raw) => {
-      if (!raw) return null
-      const s = String(raw)
-      const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-      if (isoMatch) return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]))
-      const d = new Date(s)
-      if (!isNaN(d.getTime())) return d
-      const maybe = s.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
-      if (maybe) return new Date(Number(maybe[1]), Number(maybe[2]) - 1, Number(maybe[3]))
-      return null
-    }
-
-    const now = new Date()
-    const MS_PER_DAY = 1000 * 60 * 60 * 24
-    const toUpdate = []
-
-    const normalized = (data || []).map((t) => {
-      const due = parseDue(t.due_date)
-      if (due) {
-        const daysPast = Math.floor((now.getTime() - due.getTime()) / MS_PER_DAY)
-        if (daysPast > 4 && t.priority !== 'alta') {
-          toUpdate.push(t.id)
-          return { ...t, priority: 'alta' }
-        }
-      }
-      return t
-    })
-
-    // aplicar updates no banco de forma assíncrona (não aguardamos para não bloquear render)
-    if (toUpdate.length > 0) {
-      Promise.all(
-        toUpdate.map((id) =>
-          supabase.from('repair_requests').update({ priority: 'alta' }).eq('id', id)
-        )
-      ).catch((e) => console.error('Falha ao escalonar prioridades:', e))
-    }
-
-    setRequests(normalized)
+    setRequests(tasks)
     setLoading(false)
   }
 
@@ -239,15 +201,6 @@ export default function Tasks({ user }) {
   )
 
   const completedRequests = requests.filter((r) => r.status === 'concluido')
-
-  const priorityRank = (p) => (p === 'alta' ? 1 : 0)
-
-  const sortByPriorityThenId = (a, b) => {
-    const pa = priorityRank(a.priority)
-    const pb = priorityRank(b.priority)
-    if (pa !== pb) return pb - pa // alta first
-    return (b.id || 0) - (a.id || 0)
-  }
 
   return (
     <div className="space-y-5">
