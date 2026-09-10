@@ -21,7 +21,7 @@ export default function UserSwitch({ user, setUser }) {
             key={u}
             onClick={() => setUser(u)}
             className={`px-3 py-1 text-sm rounded-full font-medium transition-colors ${
-              user === u ? 'bg-ink text-white' : 'text-ink/60 hover:bg-white/50'
+              user === u ? 'bg-ink text-base' : 'text-ink/60 hover:bg-card/50'
             }`}
           >
             {u}

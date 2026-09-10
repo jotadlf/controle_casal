@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ShoppingCart, Receipt, Car, ListChecks, Calendar } from 'lucide-react'
+import { ShoppingCart, Receipt, Car, ListChecks, Calendar, Sun, Moon } from 'lucide-react'
 import UserSwitch, { useCurrentUser } from './components/UserSwitch'
 import ShoppingList from './components/ShoppingList'
 import Bills from './components/Bills'
@@ -7,6 +7,7 @@ import CarMaintenance from './components/CarMaintenance'
 import RepairRequests from './components/RepairRequests'
 import CalendarView from './components/Calendar'
 import { refreshAppBadge } from './lib/badge'
+import { useTheme } from './lib/theme'
 
 const TABS = [
   { key: 'calendario', label: 'Calendário', icon: Calendar, Component: CalendarView },
@@ -19,6 +20,7 @@ const TABS = [
 export default function App() {
   const [tab, setTab] = useState('calendario')
   const [user, setUser] = useCurrentUser()
+  const [theme, setTheme] = useTheme()
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [showInstall, setShowInstall] = useState(false)
 
@@ -54,7 +56,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-base pb-24 sm:pb-0">
-      <header className="border-b border-line bg-white sticky top-0 z-10">
+      <header className="border-b border-line bg-card sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="Casa" className="h-9 w-9" />
           <div className="flex items-center gap-2">
@@ -72,6 +74,14 @@ export default function App() {
                 Instalar
               </button>
             )}
+            <button
+              onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+              aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+              title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+              className="p-2 rounded-full border border-line text-ink/60 hover:bg-ink/5 transition-colors"
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
             <UserSwitch user={user} setUser={setUser} />
           </div>
         </div>
@@ -94,7 +104,7 @@ export default function App() {
         <Active user={user} />
       </main>
 
-      <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-line flex sm:hidden z-10">
+      <nav className="fixed bottom-0 inset-x-0 bg-card border-t border-line flex sm:hidden z-10">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -116,7 +126,7 @@ export default function App() {
 function NamePicker({ onPick }) {
   return (
     <div className="min-h-screen bg-base flex items-center justify-center px-4">
-        <div className="bg-white border border-line rounded-card p-8 max-w-sm w-full text-center space-y-4">
+        <div className="bg-card border border-line rounded-card p-8 max-w-sm w-full text-center space-y-4">
         <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="Casa" className="h-14 w-14 mx-auto" />
         <p className="text-sm text-ink/60">Quem é você?</p>
         <div className="flex flex-col gap-2">

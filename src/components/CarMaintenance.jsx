@@ -295,11 +295,11 @@ export default function CarMaintenance({ user }) {
       </FabButton>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white border border-line rounded-card p-3">
+        <div className="bg-card border border-line rounded-card p-3">
           <p className="text-xs text-ink/40">Últimos 30 dias</p>
           <p className="font-display font-semibold text-lg text-ink">R$ {total30d.toFixed(2)}</p>
         </div>
-        <div className="bg-white border border-line rounded-card p-3">
+        <div className="bg-card border border-line rounded-card p-3">
           <p className="text-xs text-ink/40">Última troca de óleo</p>
           <p className="font-display font-semibold text-lg text-ink">
             {lastOilChange ? new Date(lastOilChange.date).toLocaleDateString('pt-BR') : '—'}
@@ -319,7 +319,7 @@ export default function CarMaintenance({ user }) {
               >
                 Cancelar
               </button>
-              <button onClick={saveEntry} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+              <button onClick={saveEntry} className="flex-1 py-2 rounded-full bg-ink text-base text-sm font-medium">
                 {editingId ? 'Salvar alterações' : 'Salvar registro'}
               </button>
             </div>
@@ -332,7 +332,7 @@ export default function CarMaintenance({ user }) {
                   key={t.key}
                   onClick={() => setForm({ ...form, type: t.key })}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border ${
-                    form.type === t.key ? 'bg-ink text-white border-ink' : 'border-line text-ink/60'
+                    form.type === t.key ? 'bg-ink text-base border-ink' : 'border-line text-ink/60'
                   }`}
                 >
                   <t.icon size={14} /> {t.label}
@@ -396,7 +396,7 @@ export default function CarMaintenance({ user }) {
                 </div>
 
                 <div
-                  className="relative flex items-center justify-between gap-3 bg-white rounded-card border border-line px-4 py-3"
+                  className="relative flex items-center justify-between gap-3 bg-card rounded-card border border-line px-4 py-3"
                   style={{
                     transform: `translateX(${dragX}px)`,
                     transition: isActiveDrag ? 'none' : 'transform 0.2s ease',

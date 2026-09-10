@@ -1,25 +1,27 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
       colors: {
-        base: '#F6F7F5',
-        ink: '#1A1D23',
+        base: 'rgb(var(--color-base) / <alpha-value>)',
+        card: 'rgb(var(--color-card) / <alpha-value>)',
+        ink: 'rgb(var(--color-ink) / <alpha-value>)',
+        line: 'rgb(var(--color-line) / <alpha-value>)',
         teal: {
-          DEFAULT: '#0F5257',
-          light: '#E4EFEF',
-          dark: '#0A3A3D',
+          DEFAULT: 'rgb(var(--color-teal) / <alpha-value>)',
+          light: 'rgb(var(--color-teal-light) / <alpha-value>)',
+          dark: 'rgb(var(--color-teal-dark) / <alpha-value>)',
         },
         amber: {
-          DEFAULT: '#E8A33D',
-          light: '#FBF0DC',
+          DEFAULT: 'rgb(var(--color-amber) / <alpha-value>)',
+          light: 'rgb(var(--color-amber-light) / <alpha-value>)',
         },
         coral: {
-          DEFAULT: '#E15B4F',
-          light: '#FBE7E5',
+          DEFAULT: 'rgb(var(--color-coral) / <alpha-value>)',
+          light: 'rgb(var(--color-coral-light) / <alpha-value>)',
         },
-        line: '#E1E4E0',
       },
       fontFamily: {
         display: ['"Space Grotesk"', 'sans-serif'],

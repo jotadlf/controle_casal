@@ -256,7 +256,7 @@ export default function Bills({ user }) {
         <p className="text-xs text-ink/40 mt-0.5">Toque numa conta pra ver detalhes, arraste para a direita pra marcar como paga, para a esquerda pra remover.</p>
       </div>
 
-      <div className="flex items-center justify-between bg-white border border-line rounded-card px-3 py-2">
+      <div className="flex items-center justify-between bg-card border border-line rounded-card px-3 py-2">
         <button onClick={() => changeMonth(-1)} aria-label="Mês anterior" className="p-1.5 rounded-full text-ink/50 hover:bg-ink/5">
           <ChevronLeft size={16} />
         </button>
@@ -277,15 +277,15 @@ export default function Bills({ user }) {
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white border border-line rounded-card p-3">
+        <div className="bg-card border border-line rounded-card p-3">
           <p className="text-xs text-ink/40">Em aberto</p>
           <p className="font-display font-semibold text-lg text-coral">{formatCurrency(totalOpen)}</p>
         </div>
-        <div className="bg-white border border-line rounded-card p-3">
+        <div className="bg-card border border-line rounded-card p-3">
           <p className="text-xs text-ink/40">Pago</p>
           <p className="font-display font-semibold text-lg text-teal-dark">{formatCurrency(totalPaid)}</p>
         </div>
-        <div className="bg-white border border-line rounded-card p-3">
+        <div className="bg-card border border-line rounded-card p-3">
           <p className="text-xs text-ink/40">Total</p>
           <p className="font-display font-semibold text-lg text-ink">{formatCurrency(totalGeral)}</p>
         </div>
@@ -307,7 +307,7 @@ export default function Bills({ user }) {
               >
                 Cancelar
               </button>
-              <button onClick={saveBill} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+              <button onClick={saveBill} className="flex-1 py-2 rounded-full bg-ink text-base text-sm font-medium">
                 {editingId ? 'Salvar alterações' : 'Salvar conta'}
               </button>
             </div>
@@ -326,7 +326,7 @@ export default function Bills({ user }) {
             <select
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="w-full rounded-full border border-line px-4 py-2 text-sm bg-white"
+              className="w-full rounded-full border border-line px-4 py-2 text-sm bg-card"
             >
               {CATEGORIES.map((c) => (
                 <option key={c}>{c}</option>
@@ -357,14 +357,14 @@ export default function Bills({ user }) {
               <button
                 type="button"
                 onClick={() => { setForm({ ...form, recurrence_type: 'recurring' }); if (formError) setFormError('') }}
-                className={`flex-1 py-2 rounded-full border text-sm ${form.recurrence_type === 'recurring' ? 'bg-ink text-white border-ink' : 'border-line text-ink/60'}`}
+                className={`flex-1 py-2 rounded-full border text-sm ${form.recurrence_type === 'recurring' ? 'bg-ink text-base border-ink' : 'border-line text-ink/60'}`}
               >
                 Recorrente
               </button>
               <button
                 type="button"
                 onClick={() => { setForm({ ...form, recurrence_type: 'installment' }); if (formError) setFormError('') }}
-                className={`flex-1 py-2 rounded-full border text-sm ${form.recurrence_type === 'installment' ? 'bg-ink text-white border-ink' : 'border-line text-ink/60'}`}
+                className={`flex-1 py-2 rounded-full border text-sm ${form.recurrence_type === 'installment' ? 'bg-ink text-base border-ink' : 'border-line text-ink/60'}`}
               >
                 Parcelada
               </button>
@@ -414,7 +414,7 @@ export default function Bills({ user }) {
                 </div>
 
                 <div
-                  className="relative bg-white rounded-card border border-line"
+                  className="relative bg-card rounded-card border border-line"
                   style={{
                     transform: `translateX(${dragX}px)`,
                     transition: isActiveDrag ? 'none' : 'transform 0.2s ease',

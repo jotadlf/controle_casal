@@ -13,7 +13,7 @@ export default function PurchaseModal({ item, defaultPrice = '', defaultUnit = '
       footer={
         <div className="flex gap-2">
           <button onClick={onCancel} className="flex-1 py-2 rounded-full border border-line text-sm">Cancelar</button>
-          <button onClick={() => onConfirm({ price: price || null, unit: unit || null, quantity })} className="flex-1 py-2 rounded-full bg-ink text-white text-sm">Salvar</button>
+          <button onClick={() => onConfirm({ price: price || null, unit: unit || null, quantity })} className="flex-1 py-2 rounded-full bg-ink text-base text-sm">Salvar</button>
         </div>
       }
     >
@@ -42,7 +42,7 @@ export default function PurchaseModal({ item, defaultPrice = '', defaultUnit = '
         <select
           value={unit}
           onChange={(e) => setUnit(e.target.value)}
-          className="w-full rounded-full border border-line px-4 py-2 text-sm bg-white"
+          className="w-full rounded-full border border-line px-4 py-2 text-sm bg-card"
         >
           <option value="UN">UN</option>
           <option value="KG">KG</option>

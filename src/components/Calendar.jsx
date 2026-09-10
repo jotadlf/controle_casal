@@ -257,7 +257,7 @@ export default function CalendarView({ user }) {
         <Plus size={16} />
       </FabButton>
 
-      <div className="bg-white border border-line rounded-card p-3">
+      <div className="bg-card border border-line rounded-card p-3">
         <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => changeMonth(-1)}
@@ -298,7 +298,7 @@ export default function CalendarView({ user }) {
                 <span
                   className={`w-7 h-7 flex items-center justify-center rounded-full text-xs transition-all duration-300 ${
                     isToday
-                      ? 'bg-ink text-white font-medium'
+                      ? 'bg-ink text-base font-medium'
                       : isSelected
                       ? 'bg-teal-light text-teal-dark font-medium'
                       : 'text-ink/80 hover:bg-ink/5'
@@ -315,7 +315,7 @@ export default function CalendarView({ user }) {
         {loading && <p className="text-xs text-ink/40 mt-2">Carregando...</p>}
       </div>
 
-      <div className="bg-white border border-line rounded-card p-4 space-y-4">
+      <div className="bg-card border border-line rounded-card p-4 space-y-4">
         <h3 className="font-display font-semibold text-sm text-ink">Resumo do dia</h3>
 
         <div>
@@ -365,7 +365,7 @@ export default function CalendarView({ user }) {
       {selectedDate && (
         <div className="fixed inset-0 z-40 flex items-end sm:items-center sm:justify-center">
           <div className="absolute inset-0 bg-ink/40 animate-fade-in" onClick={() => setSelectedDate(null)} />
-          <div className="relative bg-white rounded-t-card sm:rounded-card border border-line max-h-[70vh] w-full flex flex-col mx-auto sm:max-w-lg animate-pop-in">
+          <div className="relative bg-card rounded-t-card sm:rounded-card border border-line max-h-[70vh] w-full flex flex-col mx-auto sm:max-w-lg animate-pop-in">
             <div className="flex items-center justify-between px-5 py-4 border-b border-line shrink-0">
               <div>
                 <p className="font-display font-semibold text-ink capitalize">{selectedLabel}</p>
@@ -431,10 +431,10 @@ export default function CalendarView({ user }) {
                         {hasRange ? (
                           <button
                             onClick={() => setActiveEventId(isActive ? null : ev.id)}
-                            className="absolute inset-0 rounded-md bg-sky-200 border border-sky-400 px-2 py-1 text-left overflow-hidden"
+                            className="absolute inset-0 rounded-md bg-sky-200 dark:bg-sky-900/50 border border-sky-400 dark:border-sky-600 px-2 py-1 text-left overflow-hidden"
                           >
-                            <p className="text-xs font-medium text-sky-900 truncate">{ev.title}</p>
-                            <p className="text-[10px] text-sky-700">{timeLabel}</p>
+                            <p className="text-xs font-medium text-sky-900 dark:text-sky-200 truncate">{ev.title}</p>
+                            <p className="text-[10px] text-sky-700 dark:text-sky-300">{timeLabel}</p>
                           </button>
                         ) : (
                           <>
@@ -443,7 +443,7 @@ export default function CalendarView({ user }) {
                               onClick={() => setActiveEventId(isActive ? null : ev.id)}
                               className="absolute left-2 -top-2.5 max-w-[85%] text-left"
                             >
-                              <span className="inline-block bg-white px-1.5 py-0.5 rounded text-xs font-medium text-ink border border-line truncate">
+                              <span className="inline-block bg-card px-1.5 py-0.5 rounded text-xs font-medium text-ink border border-line truncate">
                                 {timeLabel} · {ev.title}
                               </span>
                             </button>
@@ -451,7 +451,7 @@ export default function CalendarView({ user }) {
                         )}
                         {isActive && (
                           <div
-                            className={`absolute left-2 z-10 bg-white border border-line rounded-card shadow-lg p-3 w-64 max-w-[80vw] animate-pop-in ${
+                            className={`absolute left-2 z-10 bg-card border border-line rounded-card shadow-lg p-3 w-64 max-w-[80vw] animate-pop-in ${
                               hasRange ? 'top-full mt-1' : 'top-4'
                             }`}
                           >
@@ -518,7 +518,7 @@ export default function CalendarView({ user }) {
               >
                 Cancelar
               </button>
-              <button onClick={saveEvent} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+              <button onClick={saveEvent} className="flex-1 py-2 rounded-full bg-ink text-base text-sm font-medium">
                 {editingEventId ? 'Salvar alterações' : 'Salvar'}
               </button>
             </div>

@@ -404,7 +404,7 @@ export default function ShoppingList({ user }) {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="text-sm text-ink/70">Comprando em: <strong>{shoppingSessionStore}</strong></span>
             <span className="text-sm text-ink/70">Total: <strong>{formatCurrency(sessionTotal)}</strong></span>
-            <button onClick={endSession} className="rounded-full px-3 py-1 text-xs bg-ink text-white hover:bg-ink/80 transition-colors">Finalizar</button>
+            <button onClick={endSession} className="rounded-full px-3 py-1 text-xs bg-ink text-base hover:bg-ink/80 transition-colors">Finalizar</button>
           </div>
         ) : (
           <button
@@ -434,10 +434,10 @@ export default function ShoppingList({ user }) {
             onFocus={() => setShowSuggestions(Boolean(newName.trim()))}
             onKeyDown={(e) => e.key === 'Enter' && addItem()}
             placeholder="Adicionar item"
-            className="w-48 sm:w-64 rounded-full border border-line px-4 py-2 text-sm bg-white shadow-lg focus:border-teal outline-none"
+            className="w-48 sm:w-64 rounded-full border border-line px-4 py-2 text-sm bg-card shadow-lg focus:border-teal outline-none"
           />
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute left-0 right-0 bottom-full mb-1 rounded-card border border-line bg-white shadow-xl overflow-hidden">
+            <div className="absolute left-0 right-0 bottom-full mb-1 rounded-card border border-line bg-card shadow-xl overflow-hidden">
               {suggestions.map((item) => (
                 <button
                   key={item.id}
@@ -458,7 +458,7 @@ export default function ShoppingList({ user }) {
           onClick={() => (showAddInput ? addItem() : setShowAddInput(true))}
           aria-label={showAddInput ? 'Confirmar item' : 'Adicionar item'}
           title={showAddInput ? 'Confirmar item' : 'Adicionar item'}
-          className="shrink-0 flex items-center justify-center bg-ink text-white w-10 h-10 rounded-full shadow-lg hover:bg-ink/80 transition-colors"
+          className="shrink-0 flex items-center justify-center bg-ink text-base w-10 h-10 rounded-full shadow-lg hover:bg-ink/80 transition-colors"
         >
           {showAddInput ? <Check size={16} /> : <Plus size={16} />}
         </button>
@@ -500,7 +500,7 @@ export default function ShoppingList({ user }) {
                 </div>
 
                 <div
-                  className="relative bg-white rounded-card border border-line"
+                  className="relative bg-card rounded-card border border-line"
                   style={{
                     transform: `translateX(${dragX}px)`,
                     transition: isActiveDrag ? 'none' : 'transform 0.2s ease',
@@ -565,7 +565,7 @@ export default function ShoppingList({ user }) {
               <button onClick={() => setEditingItemId(null)} className="flex-1 py-2 rounded-full border border-line text-sm">
                 Cancelar
               </button>
-              <button onClick={saveEditItem} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+              <button onClick={saveEditItem} className="flex-1 py-2 rounded-full bg-ink text-base text-sm font-medium">
                 Salvar
               </button>
             </div>
@@ -601,7 +601,7 @@ export default function ShoppingList({ user }) {
                   const name = modalStoreName.trim() || (recentStores[0] || '')
                   if (name) startSession(name)
                 }}
-                className="flex-1 py-2 rounded-full bg-ink text-white text-sm"
+                className="flex-1 py-2 rounded-full bg-ink text-base text-sm"
               >
                 Iniciar
               </button>

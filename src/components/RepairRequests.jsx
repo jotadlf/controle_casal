@@ -261,7 +261,7 @@ export default function Tasks({ user }) {
           onClick={() => setShowCompletedPanel((v) => !v)}
           aria-label="Arquivados"
           title="Arquivados"
-          className="flex items-center justify-center bg-white text-ink w-10 h-10 rounded-full shadow-lg border border-line hover:bg-ink/5 transition-colors"
+          className="flex items-center justify-center bg-card text-ink w-10 h-10 rounded-full shadow-lg border border-line hover:bg-ink/5 transition-colors"
         >
           <Archive size={16} />
         </button>
@@ -292,7 +292,7 @@ export default function Tasks({ user }) {
         <div className="mt-3">
           <ul className="mt-2 space-y-2">
             {[...completedRequests].sort(sortByPriorityThenId).map((req) => (
-              <li key={`c-${req.id}`} className="flex items-center gap-3 rounded-card overflow-hidden bg-white border border-line px-4 py-2">
+              <li key={`c-${req.id}`} className="flex items-center gap-3 rounded-card overflow-hidden bg-card border border-line px-4 py-2">
                 <span className="shrink-0 inline-block w-2 h-2 rounded-full bg-teal" title="Concluído" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-ink/50 truncate line-through">{req.title}</p>
@@ -319,7 +319,7 @@ export default function Tasks({ user }) {
               >
                 Cancelar
               </button>
-              <button onClick={addRequest} className="flex-1 py-2 rounded-full bg-ink text-white text-sm font-medium">
+              <button onClick={addRequest} className="flex-1 py-2 rounded-full bg-ink text-base text-sm font-medium">
                 Criar tarefa
               </button>
             </div>
@@ -365,7 +365,7 @@ export default function Tasks({ user }) {
             <select
               value={form.assigned_to}
               onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}
-              className="w-full rounded-full border border-line px-4 py-2 text-sm bg-white"
+              className="w-full rounded-full border border-line px-4 py-2 text-sm bg-card"
             >
               <option value="">Atribuir a...</option>
               {USERS.map((u) => (
@@ -381,7 +381,7 @@ export default function Tasks({ user }) {
       <div className="flex gap-2 text-xs flex-wrap">
         <button
           onClick={() => setFilter('todos')}
-          className={`px-3 py-1 rounded-full border ${filter === 'todos' ? 'bg-ink text-white border-ink' : 'border-line text-ink/60'}`}
+          className={`px-3 py-1 rounded-full border ${filter === 'todos' ? 'bg-ink text-base border-ink' : 'border-line text-ink/60'}`}
         >
           Todos
         </button>
@@ -389,7 +389,7 @@ export default function Tasks({ user }) {
           <button
             key={s.key}
             onClick={() => setFilter(s.key)}
-            className={`px-3 py-1 rounded-full border ${filter === s.key ? 'bg-ink text-white border-ink' : 'border-line text-ink/60'}`}
+            className={`px-3 py-1 rounded-full border ${filter === s.key ? 'bg-ink text-base border-ink' : 'border-line text-ink/60'}`}
           >
             {s.label}
           </button>
@@ -423,7 +423,7 @@ export default function Tasks({ user }) {
                 </div>
 
                 <div
-                  className={`relative flex items-center gap-3 bg-white border border-line rounded-card ${hasDetails ? 'cursor-pointer' : ''}`}
+                  className={`relative flex items-center gap-3 bg-card border border-line rounded-card ${hasDetails ? 'cursor-pointer' : ''}`}
                   style={{
                     transform: `translateX(${dragX}px)`,
                     transition: isDragging && drag.dragging ? 'none' : 'transform 0.2s ease',
