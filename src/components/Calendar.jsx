@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, X, Trash2, Pencil, Maximize2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, Trash2, Pencil, Maximize2, Copy, ClipboardPaste } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { refreshAppBadge } from '../lib/badge'
 import { currentReferenceMonth, installmentNumber } from '../lib/bills'
@@ -48,6 +48,7 @@ export default function CalendarView({ user }) {
   const timelineRef = useRef(null)
   const [highPriorityTasks, setHighPriorityTasks] = useState([])
   const [dueBills, setDueBills] = useState([])
+  const [clipboard, setClipboard] = useState(null)
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60000)
@@ -187,6 +188,19 @@ export default function CalendarView({ user }) {
       if (data.event_date === todayKey) refreshAppBadge(user)
     }
     return null
+  }
+
+  async function pasteEvent() {
+    if (!clipboard || !selectedDate) return
+    const payload = {
+      title: clipboard.title,
+      description: clipboard.description || null,
+      event_date: selectedDate,
+      event_time: clipboard.time || null,
+      event_end_time: clipboard.time ? clipboard.endTime || null : null,
+      color: clipboard.color || DEFAULT_EVENT_COLOR,
+    }
+    await handleSaveEvent(payload, null)
   }
 
   async function removeEvent(id) {
@@ -367,6 +381,16 @@ export default function CalendarView({ user }) {
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
+                    {clipboard && (
+                      <button
+                        onClick={pasteEvent}
+                        aria-label="Colar compromisso"
+                        title={`Colar "${clipboard.title}"`}
+                        className="p-2 rounded-full text-ink/50 hover:bg-ink/5"
+                      >
+                        <ClipboardPaste size={18} />
+                      </button>
+                    )}
                     <button
                       onClick={openNewEventForm}
                       aria-label="Adicionar compromisso"
@@ -459,6 +483,22 @@ export default function CalendarView({ user }) {
                                   </span>
                                   <div className="flex items-center gap-1">
                                     <button
+                                      onClick={() => {
+                                        setClipboard({
+                                          title: ev.title,
+                                          description: ev.description || '',
+                                          time: ev.event_time ? ev.event_time.slice(0, 5) : '',
+                                          endTime: ev.event_end_time ? ev.event_end_time.slice(0, 5) : '',
+                                          color: ev.color || DEFAULT_EVENT_COLOR,
+                                        })
+                                        setActiveEventId(null)
+                                      }}
+                                      aria-label="Copiar compromisso"
+                                      className="p-1 text-ink/40 hover:bg-ink/5 rounded-full"
+                                    >
+                                      <Copy size={14} />
+                                    </button>
+                                    <button
                                       onClick={() => openEditEventForm(ev)}
                                       aria-label="Editar compromisso"
                                       className="p-1 text-ink/40 hover:bg-ink/5 rounded-full"
@@ -499,6 +539,7 @@ export default function CalendarView({ user }) {
               editingEventId={eventModal.id}
               onSave={handleSaveEvent}
               onDelete={eventModal.id ? () => removeEvent(eventModal.id) : null}
+              onCopy={setClipboard}
               onClose={() => setEventModal(null)}
             />
           )}
@@ -509,6 +550,9 @@ export default function CalendarView({ user }) {
         <WeekAgenda
           user={user}
           initialDate={selectedDateAsDate || new Date()}
+          clipboard={clipboard}
+          onCopyEvent={setClipboard}
+          onClearClipboard={() => setClipboard(null)}
           onClose={() => { setShowWeekAgenda(false); loadEvents() }}
         />
       )}

@@ -36,7 +36,7 @@ function minutesToTime(mins) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`
 }
 
-export default function WeekAgenda({ user, initialDate, onClose }) {
+export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, onClearClipboard, onClose }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(initialDate || new Date()))
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -106,6 +106,10 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
   const dayColumnRefs = useRef({})
   const dragStart = useRef({ x: 0, y: 0 })
   const [drag, setDrag] = useState({ id: null, dx: 0, dy: 0, dragging: false, moved: false })
+
+  // --- redimensionar: arrastar a borda de cima ou de baixo do card muda o
+  // horário de início ou término, mantendo a outra ponta fixa.
+  const [resize, setResize] = useState({ id: null, edge: null, dy: 0, active: false })
 
   // ao trocar de semana (inclusive na primeira renderização), rola a grade
   // pra deixar o dia e o horário atuais em evidência, em vez de abrir
@@ -228,19 +232,112 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
     setDrag({ id: null, dx: 0, dy: 0, dragging: false, moved: false })
   }
 
+  function handleResizeStart(e, id, edge) {
+    e.stopPropagation()
+    dragStart.current = { x: e.clientX, y: e.clientY }
+    setResize({ id, edge, dy: 0, active: true })
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handleResizeMove(e, id) {
+    e.stopPropagation()
+    const { clientY } = e
+    setResize((r) => {
+      if (!r.active || r.id !== id) return r
+      return { ...r, dy: clientY - dragStart.current.y }
+    })
+  }
+
+  async function handleResizeEnd(e, id, ev) {
+    e.stopPropagation()
+    if (resize.id !== id || !resize.active) return
+    const { edge, dy } = resize
+    setResize({ id: null, edge: null, dy: 0, active: false })
+
+    const start = parseTime(ev.event_time)
+    if (!start) return
+    const totalPx = HOUR_HEIGHT * 24
+    const minPx = (SNAP_MINUTES / (24 * 60)) * totalPx
+    const startMinutes = start.hours * 60 + start.minutes
+    const end = parseTime(ev.event_end_time)
+    const endMinutes = end && end.hours * 60 + end.minutes > startMinutes ? end.hours * 60 + end.minutes : startMinutes + 30
+    const top = (startMinutes / (24 * 60)) * totalPx
+    const height = Math.max(((endMinutes - startMinutes) / (24 * 60)) * totalPx, 24)
+
+    let newTop = top
+    let newHeight = height
+    if (edge === 'top') {
+      newTop = Math.min(Math.max(top + dy, 0), top + height - minPx)
+      newHeight = top + height - newTop
+    } else {
+      newHeight = Math.min(Math.max(height + dy, minPx), totalPx - top)
+    }
+
+    let newStartMinutes = Math.round((newTop / totalPx) * 24 * 60 / SNAP_MINUTES) * SNAP_MINUTES
+    let newEndMinutes = Math.round(((newTop + newHeight) / totalPx) * 24 * 60 / SNAP_MINUTES) * SNAP_MINUTES
+    newStartMinutes = Math.max(0, Math.min(newStartMinutes, 24 * 60 - SNAP_MINUTES))
+    newEndMinutes = Math.max(newStartMinutes + SNAP_MINUTES, Math.min(newEndMinutes, 24 * 60))
+
+    if (newStartMinutes === startMinutes && newEndMinutes === endMinutes) return
+
+    const payload = { event_time: minutesToTime(newStartMinutes), event_end_time: minutesToTime(newEndMinutes) }
+    setEvents((prev) => prev.map((e) => (e.id === ev.id ? { ...e, ...payload } : e)))
+    const { error } = await supabase.from('calendar_events').update(payload).eq('id', ev.id)
+    if (error) {
+      console.error('Falha ao redimensionar compromisso:', error)
+      loadEvents()
+      return
+    }
+    const todayKey = toDateKey(now.getFullYear(), now.getMonth(), now.getDate())
+    if (ev.event_date === todayKey) refreshAppBadge(user)
+  }
+
+  function handleResizeCancel() {
+    setResize({ id: null, edge: null, dy: 0, active: false })
+  }
+
   // --- criar / editar ---
   function openNewEvent(dateKey, time = '') {
     setEventModal({ id: null, form: { title: '', description: '', date: dateKey, time, endTime: '', color: DEFAULT_EVENT_COLOR } })
   }
 
-  // dois cliques num horário vazio da grade já abre o formulário com
-  // aquele dia e horário preenchidos (arredondado pros 15min mais próximos)
+  async function pasteEventAt(dateKey, timeStr) {
+    let endTimeStr = null
+    const cStart = parseTime(clipboard.time)
+    const cEnd = parseTime(clipboard.endTime)
+    const start = parseTime(timeStr)
+    if (cStart && cEnd && start) {
+      const duration = (cEnd.hours * 60 + cEnd.minutes) - (cStart.hours * 60 + cStart.minutes)
+      if (duration > 0) {
+        const newEndMinutes = Math.min(start.hours * 60 + start.minutes + duration, 24 * 60 - 1)
+        endTimeStr = minutesToTime(newEndMinutes).slice(0, 5)
+      }
+    }
+    const payload = {
+      title: clipboard.title,
+      description: clipboard.description || null,
+      event_date: dateKey,
+      event_time: timeStr || null,
+      event_end_time: timeStr ? endTimeStr : null,
+      color: clipboard.color || DEFAULT_EVENT_COLOR,
+    }
+    await handleSaveEvent(payload, null)
+  }
+
+  // dois cliques num horário vazio da grade abre o formulário com aquele
+  // dia e horário preenchidos (arredondado pros 15min mais próximos), ou
+  // cola o compromisso copiado ali, se houver um na área de transferência.
   function handleDayDoubleClick(e, dateKey) {
     const rect = e.currentTarget.getBoundingClientRect()
     const relativeY = e.clientY - rect.top
     let minutes = Math.round((relativeY / HOUR_HEIGHT) * 60 / SNAP_MINUTES) * SNAP_MINUTES
     minutes = Math.max(0, Math.min(minutes, 24 * 60 - SNAP_MINUTES))
-    openNewEvent(dateKey, minutesToTime(minutes).slice(0, 5))
+    const timeStr = minutesToTime(minutes).slice(0, 5)
+    if (clipboard) {
+      pasteEventAt(dateKey, timeStr)
+      return
+    }
+    openNewEvent(dateKey, timeStr)
   }
 
   function openEditEvent(ev) {
@@ -304,8 +401,25 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
       </div>
 
       <p className="text-xs text-ink/40 px-4 py-1">
-        {loading ? 'Carregando...' : 'Dois cliques num horário vazio criam um compromisso. Arraste um compromisso pra mudar de dia/horário.'}
+        {loading
+          ? 'Carregando...'
+          : 'Dois cliques num horário vazio criam um compromisso. Arraste um compromisso pra mudar de dia/horário, ou pela borda de cima/baixo pra redimensionar.'}
       </p>
+
+      {clipboard && (
+        <div className="flex items-center justify-between gap-2 px-4 pb-1">
+          <p className="text-xs text-teal-dark bg-teal-light rounded-full px-2.5 py-1 truncate">
+            Copiado: {clipboard.title} — dois cliques num horário pra colar
+          </p>
+          <button
+            onClick={onClearClipboard}
+            aria-label="Cancelar cópia"
+            className="p-1 text-ink/40 hover:bg-ink/5 rounded-full shrink-0"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       <div ref={scrollRef} className="flex-1 overflow-auto">
         <div className="flex w-full" style={{ minWidth: HOUR_COL_WIDTH + 7 * DAY_COL_WIDTH }}>
@@ -364,15 +478,26 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
                     const dy = isActiveDrag ? drag.dy : 0
                     const color = getEventColor(ev.color)
 
+                    const isResizingThis = resize.id === ev.id && resize.active
+                    const minPx = (SNAP_MINUTES / (24 * 60)) * (HOUR_HEIGHT * 24)
+                    let displayTop = top
+                    let displayHeight = height
+                    if (isResizingThis && resize.edge === 'top') {
+                      displayTop = Math.min(Math.max(top + resize.dy, 0), top + height - minPx)
+                      displayHeight = top + height - displayTop
+                    } else if (isResizingThis) {
+                      displayHeight = Math.min(Math.max(height + resize.dy, minPx), HOUR_HEIGHT * 24 - top)
+                    }
+
                     return (
                       <div
                         key={ev.id}
-                        className={`absolute left-1 right-1 rounded-md border px-1.5 py-1 overflow-hidden cursor-grab ${color.card} ${color.text} ${isActiveDrag ? 'z-30 shadow-xl' : 'z-[5]'}`}
+                        className={`absolute left-1 right-1 rounded-md border px-1.5 py-1 overflow-hidden cursor-grab ${color.card} ${color.text} ${isActiveDrag || isResizingThis ? 'z-30 shadow-xl' : 'z-[5]'}`}
                         style={{
-                          top,
-                          height,
-                          transform: `translate(${dx}px, ${dy}px) ${isActiveDrag ? 'scale(1.03)' : ''}`,
-                          transition: isActiveDrag ? 'none' : 'transform 0.2s ease',
+                          top: displayTop,
+                          height: displayHeight,
+                          transform: isResizingThis ? undefined : `translate(${dx}px, ${dy}px) ${isActiveDrag ? 'scale(1.03)' : ''}`,
+                          transition: isActiveDrag || isResizingThis ? 'none' : 'transform 0.2s ease',
                           touchAction: 'none',
                         }}
                         onPointerDown={(e) => handleDragStart(e, ev.id)}
@@ -384,6 +509,26 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
                         <p className="text-[9px] opacity-80 leading-tight">
                           {ev.event_time.slice(0, 5)}{hasRange ? `–${ev.event_end_time.slice(0, 5)}` : ''}
                         </p>
+                        <div
+                          onPointerDown={(e) => handleResizeStart(e, ev.id, 'top')}
+                          onPointerMove={(e) => handleResizeMove(e, ev.id)}
+                          onPointerUp={(e) => handleResizeEnd(e, ev.id, ev)}
+                          onPointerCancel={handleResizeCancel}
+                          className="absolute left-0 right-0 top-0 h-2 cursor-row-resize flex items-start justify-center"
+                          style={{ touchAction: 'none' }}
+                        >
+                          <span className="w-4 h-0.5 rounded-full bg-current opacity-40 mt-0.5" />
+                        </div>
+                        <div
+                          onPointerDown={(e) => handleResizeStart(e, ev.id, 'bottom')}
+                          onPointerMove={(e) => handleResizeMove(e, ev.id)}
+                          onPointerUp={(e) => handleResizeEnd(e, ev.id, ev)}
+                          onPointerCancel={handleResizeCancel}
+                          className="absolute left-0 right-0 bottom-0 h-2 cursor-row-resize flex items-end justify-center"
+                          style={{ touchAction: 'none' }}
+                        >
+                          <span className="w-4 h-0.5 rounded-full bg-current opacity-40 mb-0.5" />
+                        </div>
                       </div>
                     )
                   })}
@@ -404,6 +549,7 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
           editingEventId={eventModal.id}
           onSave={handleSaveEvent}
           onDelete={eventModal.id ? () => handleDeleteEvent(eventModal.id) : null}
+          onCopy={onCopyEvent}
           onClose={() => setEventModal(null)}
         />
       )}

@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { Copy } from 'lucide-react'
 import Modal from './Modal'
 import { EVENT_COLORS, DEFAULT_EVENT_COLOR } from '../lib/eventColors'
 
-export default function EventModal({ initialForm, editingEventId, onSave, onDelete, onClose }) {
+export default function EventModal({ initialForm, editingEventId, onSave, onDelete, onCopy, onClose }) {
   const [form, setForm] = useState({ color: DEFAULT_EVENT_COLOR, ...initialForm })
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -38,6 +39,17 @@ export default function EventModal({ initialForm, editingEventId, onSave, onDele
     onClose()
   }
 
+  function handleCopy() {
+    onCopy({
+      title: form.title.trim(),
+      description: form.description.trim(),
+      time: form.time || '',
+      endTime: form.time ? form.endTime || '' : '',
+      color: form.color || DEFAULT_EVENT_COLOR,
+    })
+    onClose()
+  }
+
   return (
     <Modal
       title={editingEventId ? 'Editar compromisso' : 'Novo compromisso'}
@@ -50,6 +62,16 @@ export default function EventModal({ initialForm, editingEventId, onSave, onDele
               className="py-2 px-4 rounded-full border border-coral/40 text-coral text-sm"
             >
               Excluir
+            </button>
+          )}
+          {editingEventId && onCopy && (
+            <button
+              onClick={handleCopy}
+              aria-label="Copiar compromisso"
+              title="Copiar compromisso"
+              className="py-2 px-3 rounded-full border border-line text-ink/60"
+            >
+              <Copy size={16} />
             </button>
           )}
           <button onClick={onClose} className="flex-1 py-2 rounded-full border border-line text-sm">
