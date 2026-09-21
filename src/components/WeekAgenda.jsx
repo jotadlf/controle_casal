@@ -5,6 +5,7 @@ import { toDateKey, parseTime } from '../lib/date'
 import { refreshAppBadge } from '../lib/badge'
 import EventModal from './EventModal'
 import FabButton from './FabButton'
+import { getEventColor, DEFAULT_EVENT_COLOR } from '../lib/eventColors'
 
 const HOUR_HEIGHT = 48
 const DAY_COL_WIDTH = 132
@@ -229,7 +230,7 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
 
   // --- criar / editar ---
   function openNewEvent(dateKey, time = '') {
-    setEventModal({ id: null, form: { title: '', description: '', date: dateKey, time, endTime: '' } })
+    setEventModal({ id: null, form: { title: '', description: '', date: dateKey, time, endTime: '', color: DEFAULT_EVENT_COLOR } })
   }
 
   // dois cliques num horário vazio da grade já abre o formulário com
@@ -251,6 +252,7 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
         date: ev.event_date,
         time: ev.event_time ? ev.event_time.slice(0, 5) : '',
         endTime: ev.event_end_time ? ev.event_end_time.slice(0, 5) : '',
+        color: ev.color || DEFAULT_EVENT_COLOR,
       },
     })
   }
@@ -360,11 +362,12 @@ export default function WeekAgenda({ user, initialDate, onClose }) {
                     const isActiveDrag = drag.id === ev.id && drag.dragging
                     const dx = isActiveDrag ? drag.dx : 0
                     const dy = isActiveDrag ? drag.dy : 0
+                    const color = getEventColor(ev.color)
 
                     return (
                       <div
                         key={ev.id}
-                        className={`absolute left-1 right-1 rounded-md bg-sky-200 dark:bg-sky-900/60 border border-sky-400 dark:border-sky-600 text-sky-900 dark:text-sky-200 px-1.5 py-1 overflow-hidden cursor-grab ${isActiveDrag ? 'z-30 shadow-xl' : 'z-[5]'}`}
+                        className={`absolute left-1 right-1 rounded-md border px-1.5 py-1 overflow-hidden cursor-grab ${color.card} ${color.text} ${isActiveDrag ? 'z-30 shadow-xl' : 'z-[5]'}`}
                         style={{
                           top,
                           height,

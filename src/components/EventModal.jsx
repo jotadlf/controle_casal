@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import Modal from './Modal'
+import { EVENT_COLORS, DEFAULT_EVENT_COLOR } from '../lib/eventColors'
 
 export default function EventModal({ initialForm, editingEventId, onSave, onDelete, onClose }) {
-  const [form, setForm] = useState(initialForm)
+  const [form, setForm] = useState({ color: DEFAULT_EVENT_COLOR, ...initialForm })
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -25,6 +26,7 @@ export default function EventModal({ initialForm, editingEventId, onSave, onDele
       event_date: form.date,
       event_time: form.time || null,
       event_end_time: form.time ? form.endTime || null : null,
+      color: form.color || DEFAULT_EVENT_COLOR,
     }
     setSaving(true)
     const error = await onSave(payload, editingEventId)
@@ -106,6 +108,23 @@ export default function EventModal({ initialForm, editingEventId, onSave, onDele
             Compromisso vai ocupar o intervalo de {form.time} até {form.endTime} na agenda do dia.
           </p>
         )}
+        <div>
+          <p className="text-xs text-ink/40 mb-1.5 px-1">Cor</p>
+          <div className="flex items-center gap-2">
+            {EVENT_COLORS.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => setForm({ ...form, color: c.key })}
+                aria-label={c.label}
+                title={c.label}
+                className={`w-7 h-7 rounded-full ${c.swatch} transition-transform ${
+                  form.color === c.key ? 'ring-2 ring-offset-2 ring-ink scale-105' : 'hover:scale-105'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
         <textarea
           placeholder="Detalhes (opcional)"
           value={form.description}

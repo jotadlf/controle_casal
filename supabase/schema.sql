@@ -36,6 +36,11 @@ create index if not exists calendar_events_event_date_idx on calendar_events (ev
 alter table calendar_events
   add column if not exists event_end_time time;
 
+-- Cor do compromisso, usada pra colorir o card na agenda (dia/semana).
+-- Chave de uma paleta fixa definida em src/lib/eventColors.js.
+alter table calendar_events
+  add column if not exists color text not null default 'sky';
+
 -- Recorrência de contas: uma conta pode se repetir indefinidamente (ex:
 -- aluguel) ou ser parcelada por uma quantidade fixa de meses (ex:
 -- financiamento em 12x). start_month marca o mês de referência da 1ª

@@ -8,6 +8,7 @@ import EventModal from './EventModal'
 import FabButton from './FabButton'
 import Kanban from './Kanban'
 import WeekAgenda from './WeekAgenda'
+import { getEventColor, DEFAULT_EVENT_COLOR } from '../lib/eventColors'
 
 const VIEWS = [
   { key: 'calendario', label: 'Calendário' },
@@ -149,7 +150,7 @@ export default function CalendarView({ user }) {
   }, [selectedDate])
 
   function openNewEventForm() {
-    setEventModal({ id: null, form: { title: '', description: '', date: selectedDate || todayKey, time: '', endTime: '' } })
+    setEventModal({ id: null, form: { title: '', description: '', date: selectedDate || todayKey, time: '', endTime: '', color: DEFAULT_EVENT_COLOR } })
   }
 
   function openEditEventForm(ev) {
@@ -162,6 +163,7 @@ export default function CalendarView({ user }) {
         date: ev.event_date,
         time: ev.event_time ? ev.event_time.slice(0, 5) : '',
         endTime: ev.event_end_time ? ev.event_end_time.slice(0, 5) : '',
+        color: ev.color || DEFAULT_EVENT_COLOR,
       },
     })
   }
@@ -276,7 +278,9 @@ export default function CalendarView({ user }) {
                 if (!dateKey) return <span key={i} />
                 const day = Number(dateKey.slice(-2))
                 const isToday = dateKey === todayKey
-                const hasEvents = Boolean(eventsByDate[dateKey]?.length)
+                const dayEventsList = eventsByDate[dateKey]
+                const hasEvents = Boolean(dayEventsList?.length)
+                const dotColor = hasEvents ? getEventColor(dayEventsList[0].color).dot : 'bg-transparent'
                 const isSelected = dateKey === selectedDate
                 return (
                   <button
@@ -295,7 +299,7 @@ export default function CalendarView({ user }) {
                     >
                       {day}
                     </span>
-                    <span className={`w-1 h-1 rounded-full ${hasEvents ? 'bg-coral' : 'bg-transparent'}`} />
+                    <span className={`w-1 h-1 rounded-full ${dotColor}`} />
                   </button>
                 )
               })}
@@ -409,6 +413,7 @@ export default function CalendarView({ user }) {
                       const timeLabel = hasRange
                         ? `${ev.event_time.slice(0, 5)}–${ev.event_end_time.slice(0, 5)}`
                         : ev.event_time.slice(0, 5)
+                      const color = getEventColor(ev.color)
 
                       return (
                         <div
@@ -420,18 +425,19 @@ export default function CalendarView({ user }) {
                             {hasRange ? (
                               <button
                                 onClick={() => setActiveEventId(isActive ? null : ev.id)}
-                                className="absolute inset-0 rounded-md bg-sky-200 dark:bg-sky-900/50 border border-sky-400 dark:border-sky-600 px-2 py-1 text-left overflow-hidden"
+                                className={`absolute inset-0 rounded-md border px-2 py-1 text-left overflow-hidden ${color.card}`}
                               >
-                                <p className="text-xs font-medium text-sky-900 dark:text-sky-200 truncate">{ev.title}</p>
-                                <p className="text-[10px] text-sky-700 dark:text-sky-300">{timeLabel}</p>
+                                <p className={`text-xs font-medium truncate ${color.text}`}>{ev.title}</p>
+                                <p className={`text-[10px] ${color.subtext}`}>{timeLabel}</p>
                               </button>
                             ) : (
                               <>
                                 <div className="absolute left-0 right-0 h-px bg-ink/25" style={{ top: 0 }} />
                                 <button
                                   onClick={() => setActiveEventId(isActive ? null : ev.id)}
-                                  className="absolute left-2 -top-2.5 max-w-[85%] text-left"
+                                  className="absolute left-2 -top-2.5 max-w-[85%] text-left flex items-center gap-1"
                                 >
+                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color.dot}`} />
                                   <span className="inline-block bg-card px-1.5 py-0.5 rounded text-xs font-medium text-ink border border-line truncate">
                                     {timeLabel} · {ev.title}
                                   </span>
