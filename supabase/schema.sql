@@ -78,3 +78,6 @@ drop table if exists shopping_sessions;
 
 alter table shopping_items
   drop column if exists on_list;
+
+-- Filmes (aba "Filmes"): a tabela "movies" e a lista do Top 250 do IMDB
+-- ficam em supabase/movies.sql. Rode aquele arquivo também.
