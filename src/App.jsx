@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
-import { ShoppingCart, Receipt, Car, ListChecks, Calendar, Clapperboard, Sun, Moon } from 'lucide-react'
+import { ShoppingCart, ListChecks, Calendar, Clapperboard, Sun, Moon } from 'lucide-react'
 import UserSwitch, { useCurrentUser } from './components/UserSwitch'
 import ShoppingList from './components/ShoppingList'
-import Bills from './components/Bills'
-import CarMaintenance from './components/CarMaintenance'
 import RepairRequests from './components/RepairRequests'
 import CalendarView from './components/Calendar'
 import Movies from './components/Movies'
@@ -14,8 +12,6 @@ const TABS = [
   { key: 'calendario', label: 'Calendário', icon: Calendar, Component: CalendarView },
   { key: 'tarefas', label: 'Tarefas', icon: ListChecks, Component: RepairRequests },
   { key: 'compras', label: 'Compras', icon: ShoppingCart, Component: ShoppingList },
-  { key: 'contas', label: 'Contas', icon: Receipt, Component: Bills },
-  { key: 'carro', label: 'Carro', icon: Car, Component: CarMaintenance },
   { key: 'filmes', label: 'Filmes', icon: Clapperboard, Component: Movies },
 ]
 

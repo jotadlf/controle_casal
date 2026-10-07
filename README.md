@@ -1,7 +1,7 @@
 # Casa — Controle Doméstico
 
-Sistema web pra vocês dois: lista de compras com previsão, contas recorrentes,
-manutenção do carro e solicitações de reparo. 100% grátis (Supabase free tier
+Sistema web pra vocês dois: lista de compras com previsão, calendário,
+solicitações de reparo e lista de filmes. 100% grátis (Supabase free tier
 + GitHub Pages).
 
 ## 1. Criar o projeto no Supabase
@@ -88,9 +88,10 @@ como um app.
 
 ```
 src/
-  components/     → cada módulo (compras, contas, carro, reparos)
+  components/     → cada módulo (compras, calendário, reparos, filmes)
   lib/             → lógica de previsão + cliente Supabase
 supabase/
   schema.sql       → schema completo do banco (rodar uma vez)
+  remove_bills_and_car.sql → remove dados e tabelas de contas e carro
 .github/workflows/ → deploy automático pro GitHub Pages
 ```

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2, Pencil, Maximize2, Copy, ClipboardPaste } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { refreshAppBadge } from '../lib/badge'
-import { currentReferenceMonth, installmentNumber } from '../lib/bills'
 import { toDateKey, parseTime } from '../lib/date'
 import EventModal from './EventModal'
 import FabButton from './FabButton'
@@ -47,7 +46,6 @@ export default function CalendarView({ user }) {
   const [now, setNow] = useState(() => new Date())
   const timelineRef = useRef(null)
   const [highPriorityTasks, setHighPriorityTasks] = useState([])
-  const [dueBills, setDueBills] = useState([])
   const [clipboard, setClipboard] = useState(null)
 
   useEffect(() => {
@@ -56,29 +54,13 @@ export default function CalendarView({ user }) {
   }, [])
 
   async function loadDaySummary() {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayDay = today.getDate()
-    const refMonth = currentReferenceMonth()
-
-    const [{ data: tasksData }, { data: billsData }, { data: paymentsData }] = await Promise.all([
-      supabase.from('repair_requests').select('*').eq('status', 'pendente').eq('priority', 'alta'),
-      supabase.from('bills').select('*').eq('active', true),
-      supabase.from('bill_payments').select('*').eq('reference_month', refMonth),
-    ])
-
-    const paidBillIds = new Set((paymentsData || []).filter((p) => p.paid).map((p) => p.bill_id))
-    const due = (billsData || []).filter((bill) => {
-      if (paidBillIds.has(bill.id)) return false
-      if (bill.recurrence_type === 'installment') {
-        const number = installmentNumber(bill, refMonth)
-        if (number < 1 || number > bill.installments_total) return false
-      }
-      return bill.due_day <= todayDay
-    })
+    const { data: tasksData } = await supabase
+      .from('repair_requests')
+      .select('*')
+      .eq('status', 'pendente')
+      .eq('priority', 'alta')
 
     setHighPriorityTasks(tasksData || [])
-    setDueBills(due)
   }
 
   useEffect(() => {
@@ -344,29 +326,6 @@ export default function CalendarView({ user }) {
               )}
             </div>
 
-            <div>
-              <p className="text-xs text-ink/40 mb-1.5">Contas vencendo hoje ou atrasadas</p>
-              {dueBills.length === 0 ? (
-                <p className="text-xs text-ink/30">Nenhuma.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {dueBills.map((bill) => {
-                    const overdueDays = now.getDate() - bill.due_day
-                    return (
-                      <li key={bill.id} className="flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-2 min-w-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-coral shrink-0" />
-                          <span className="text-sm text-ink truncate">{bill.name}</span>
-                        </span>
-                        <span className="text-xs text-coral shrink-0">
-                          {overdueDays > 0 ? `Venceu há ${overdueDays}d` : 'Vence hoje'}
-                        </span>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
           </div>
 
           {selectedDate && (
