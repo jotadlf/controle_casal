@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controle-casal-v14'
+const CACHE_NAME = 'controle-casal-v15'
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -51,37 +51,5 @@ self.addEventListener('fetch', (event) => {
         return res
       })
     }))
-  )
-})
-
-// --- notificações (lembretes de compromissos enviados pela Edge Function
-// "send-reminders"). O payload é JSON: { title, body, tag, date }.
-self.addEventListener('push', (event) => {
-  let data = {}
-  try {
-    data = event.data ? event.data.json() : {}
-  } catch (e) {
-    data = { title: 'Lembrete', body: event.data ? event.data.text() : '' }
-  }
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'Lembrete', {
-      body: data.body || '',
-      tag: data.tag,
-      icon: './icons/icon-192.png',
-      vibrate: [120, 60, 120],
-      data: { date: data.date },
-    })
-  )
-})
-
-// tocar na notificação traz o app pra frente (ou abre, se estiver fechado)
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close()
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      const existing = clients.find((c) => c.url.startsWith(self.registration.scope))
-      if (existing) return existing.focus()
-      return self.clients.openWindow(self.registration.scope)
-    })
   )
 })

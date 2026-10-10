@@ -2,10 +2,9 @@ import { useState } from 'react'
 import { Copy } from 'lucide-react'
 import Modal from './Modal'
 import { EVENT_COLORS, DEFAULT_EVENT_COLOR } from '../lib/eventColors'
-import { REMINDER_OPTIONS, DEFAULT_REMINDER, reminderFromForm } from '../lib/calendarEvents'
 
 export default function EventModal({ initialForm, editingEventId, onSave, onDelete, onCopy, onClose }) {
-  const [form, setForm] = useState({ color: DEFAULT_EVENT_COLOR, reminder: DEFAULT_REMINDER, ...initialForm })
+  const [form, setForm] = useState({ color: DEFAULT_EVENT_COLOR, ...initialForm })
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -29,7 +28,6 @@ export default function EventModal({ initialForm, editingEventId, onSave, onDele
       event_time: form.time || null,
       event_end_time: form.time ? form.endTime || null : null,
       color: form.color || DEFAULT_EVENT_COLOR,
-      reminder_minutes: reminderFromForm(form.reminder, Boolean(form.time)),
     }
     setSaving(true)
     const error = await onSave(payload, editingEventId)
@@ -48,7 +46,6 @@ export default function EventModal({ initialForm, editingEventId, onSave, onDele
       time: form.time || '',
       endTime: form.time ? form.endTime || '' : '',
       color: form.color || DEFAULT_EVENT_COLOR,
-      reminder: form.reminder ?? DEFAULT_REMINDER,
     })
     onClose()
   }
@@ -132,20 +129,6 @@ export default function EventModal({ initialForm, editingEventId, onSave, onDele
           <p className="text-xs text-ink/40 px-1">
             Compromisso vai ocupar o intervalo de {form.time} até {form.endTime} na agenda do dia.
           </p>
-        )}
-        {form.time && (
-          <label className="flex items-center gap-2 px-1">
-            <span className="text-xs text-ink/40 shrink-0">Lembrar</span>
-            <select
-              value={form.reminder}
-              onChange={(e) => setForm({ ...form, reminder: e.target.value })}
-              className="flex-1 rounded-full border border-line bg-card px-3 py-2 text-sm"
-            >
-              {REMINDER_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </label>
         )}
         <div>
           <p className="text-xs text-ink/40 mb-1.5 px-1">Cor</p>

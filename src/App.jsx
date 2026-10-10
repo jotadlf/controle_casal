@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ShoppingCart, ListChecks, Calendar, Clapperboard, Sun, Moon } from 'lucide-react'
 import UserSwitch, { useCurrentUser } from './components/UserSwitch'
-import NotificationToggle from './components/NotificationToggle'
 import ShoppingList from './components/ShoppingList'
 import RepairRequests from './components/RepairRequests'
 import CalendarView from './components/Calendar'
@@ -81,7 +80,6 @@ export default function App() {
             >
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <NotificationToggle user={user} />
             <UserSwitch user={user} setUser={setUser} />
           </div>
         </div>

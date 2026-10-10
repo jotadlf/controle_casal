@@ -8,7 +8,7 @@ import FabButton from './FabButton'
 import UndoToast from './UndoToast'
 import { getEventColor, DEFAULT_EVENT_COLOR } from '../lib/eventColors'
 import { layoutOverlappingEvents } from '../lib/eventLayout'
-import { pickEventFields, clipboardFromEvent, reminderToForm, reminderFromForm, DEFAULT_REMINDER, dateKeyOf, addDays } from '../lib/calendarEvents'
+import { pickEventFields, clipboardFromEvent, dateKeyOf, addDays } from '../lib/calendarEvents'
 import { useUndo, isTypingTarget } from '../lib/useUndo'
 
 const HOUR_HEIGHT = 48
@@ -539,7 +539,6 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
       event_time: timeStr || null,
       event_end_time: timeStr ? endTimeStr : null,
       color: clipboard.color || DEFAULT_EVENT_COLOR,
-      reminder_minutes: reminderFromForm(clipboard.reminder ?? DEFAULT_REMINDER, Boolean(timeStr)),
     }
     return insertEvent(payload, `"${clipboard.title}" colado`)
   }
@@ -569,7 +568,6 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
         time: ev.event_time ? ev.event_time.slice(0, 5) : '',
         endTime: ev.event_end_time ? ev.event_end_time.slice(0, 5) : '',
         color: ev.color || DEFAULT_EVENT_COLOR,
-        reminder: reminderToForm(ev.reminder_minutes),
       },
     })
   }
