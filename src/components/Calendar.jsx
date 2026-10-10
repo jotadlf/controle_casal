@@ -8,6 +8,7 @@ import FabButton from './FabButton'
 import Kanban from './Kanban'
 import WeekAgenda from './WeekAgenda'
 import { getEventColor, DEFAULT_EVENT_COLOR } from '../lib/eventColors'
+import { layoutOverlappingEvents } from '../lib/eventLayout'
 
 const VIEWS = [
   { key: 'calendario', label: 'Calendário' },
@@ -116,6 +117,8 @@ export default function CalendarView({ user }) {
   const dayEvents = selectedDate
     ? [...(eventsByDate[selectedDate] || [])].sort((a, b) => (a.event_time || '').localeCompare(b.event_time || ''))
     : []
+  const allDayEvents = dayEvents.filter((ev) => !parseTime(ev.event_time))
+  const dayLayout = useMemo(() => layoutOverlappingEvents(dayEvents), [selectedDate, events])
 
   function openDate(dateKey) {
     setSelectedDate(dateKey)
@@ -367,6 +370,26 @@ export default function CalendarView({ user }) {
                   </div>
                 </div>
 
+                {allDayEvents.length > 0 && (
+                  <div className="px-5 py-2 border-b border-line shrink-0 flex items-start gap-3">
+                    <span className="text-[10px] text-ink/30 w-11 shrink-0 pt-1">dia todo</span>
+                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                      {allDayEvents.map((ev) => {
+                        const color = getEventColor(ev.color)
+                        return (
+                          <button
+                            key={ev.id}
+                            onClick={() => openEditEventForm(ev)}
+                            className={`rounded-md border px-2 py-1 text-left text-xs font-medium truncate ${color.card} ${color.text}`}
+                          >
+                            {ev.title}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div ref={timelineRef} className="overflow-y-auto px-5 py-3">
                   <div className="relative" style={{ height: HOUR_HEIGHT * 24 }}>
                     {Array.from({ length: 24 }).map((_, hour) => (
@@ -397,12 +420,18 @@ export default function CalendarView({ user }) {
                         ? `${ev.event_time.slice(0, 5)}–${ev.event_end_time.slice(0, 5)}`
                         : ev.event_time.slice(0, 5)
                       const color = getEventColor(ev.color)
+                      const { col = 0, cols = 1 } = dayLayout[ev.id] || {}
 
                       return (
                         <div
                           key={ev.id}
-                          className={`absolute left-14 right-2 transition-opacity duration-300 ${isPast ? 'opacity-40' : ''}`}
-                          style={{ top, height: hasRange ? height : undefined }}
+                          className={`absolute transition-opacity duration-300 ${isPast ? 'opacity-40' : ''} ${isActive ? 'z-20' : ''}`}
+                          style={{
+                            top,
+                            height: hasRange ? height : undefined,
+                            left: `calc(56px + (100% - 64px) * ${col / cols})`,
+                            width: `calc((100% - 64px) / ${cols} - ${cols > 1 ? 2 : 0}px)`,
+                          }}
                         >
                           <div className="relative h-full">
                             {hasRange ? (

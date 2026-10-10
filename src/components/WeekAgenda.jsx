@@ -6,6 +6,7 @@ import { refreshAppBadge } from '../lib/badge'
 import EventModal from './EventModal'
 import FabButton from './FabButton'
 import { getEventColor, DEFAULT_EVENT_COLOR } from '../lib/eventColors'
+import { layoutOverlappingEvents } from '../lib/eventLayout'
 
 const HOUR_HEIGHT = 48
 const DAY_COL_WIDTH = 132
@@ -34,6 +35,26 @@ function minutesToTime(mins) {
   const h = Math.floor(mins / 60)
   const m = mins % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`
+}
+
+function formatMinutes(mins) {
+  return minutesToTime(mins).slice(0, 5)
+}
+
+// converte uma posição vertical (px a partir do topo da coluna) em minutos
+// do dia, arredondado pro passo de 15min e limitado ao intervalo [0, max].
+function pxToMinutes(px, max = 24 * 60 - SNAP_MINUTES, round = Math.round) {
+  const minutes = round((px / HOUR_HEIGHT) * 60 / SNAP_MINUTES) * SNAP_MINUTES
+  return Math.max(0, Math.min(minutes, max))
+}
+
+function eventMinutes(ev) {
+  const start = parseTime(ev.event_time)
+  if (!start) return null
+  const startMinutes = start.hours * 60 + start.minutes
+  const end = parseTime(ev.event_end_time)
+  const endMinutes = end ? end.hours * 60 + end.minutes : null
+  return { start: startMinutes, end: endMinutes !== null && endMinutes > startMinutes ? endMinutes : null }
 }
 
 export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, onClearClipboard, onClose }) {
@@ -83,14 +104,29 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekStart, user])
 
-  const eventsByDate = useMemo(() => {
-    const map = {}
+  // compromissos com horário vão pra grade; os sem horário ficam na faixa
+  // "dia todo" no topo de cada coluna.
+  const { timedByDate, allDayByDate, maxAllDay } = useMemo(() => {
+    const timed = {}
+    const allDay = {}
     for (const ev of events) {
-      if (!map[ev.event_date]) map[ev.event_date] = []
-      map[ev.event_date].push(ev)
+      const target = parseTime(ev.event_time) ? timed : allDay
+      if (!target[ev.event_date]) target[ev.event_date] = []
+      target[ev.event_date].push(ev)
     }
-    return map
+    for (const list of Object.values(allDay)) list.sort((a, b) => a.title.localeCompare(b.title))
+    const max = Math.max(0, ...Object.values(allDay).map((list) => list.length))
+    return { timedByDate: timed, allDayByDate: allDay, maxAllDay: max }
   }, [events])
+
+  const layoutByDate = useMemo(() => {
+    const map = {}
+    for (const [dateKey, list] of Object.entries(timedByDate)) map[dateKey] = layoutOverlappingEvents(list)
+    return map
+  }, [timedByDate])
+
+  const ALL_DAY_ROW = 20
+  const headerHeight = 48 + (maxAllDay ? maxAllDay * ALL_DAY_ROW + 6 : 0)
 
   function changeWeek(delta) {
     setWeekStart((d) => {
@@ -101,11 +137,18 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
   }
 
   // --- arraste livre: o compromisso acompanha o dedo/mouse em qualquer
-  // direção; soltar decide o dia (coluna) e o horário (posição vertical,
-  // arredondado pros 15min mais próximos) de destino.
+  // direção; soltar decide o dia (coluna) e o horário (posição do topo do
+  // card, arredondado pros 15min mais próximos) de destino. Durante o
+  // arraste o card já mostra o horário que vai ficar.
   const dayColumnRefs = useRef({})
-  const dragStart = useRef({ x: 0, y: 0 })
-  const [drag, setDrag] = useState({ id: null, dx: 0, dy: 0, dragging: false, moved: false })
+  const dragStart = useRef({ x: 0, y: 0, grab: 0 })
+  const [drag, setDrag] = useState({ id: null, dx: 0, dy: 0, dragging: false, moved: false, previewStart: null })
+
+  // --- arrastar num horário vazio cria um compromisso com aquela duração.
+  // `creating` é a seleção em andamento; `draft` mantém o fantasma na grade
+  // enquanto o formulário do novo compromisso está aberto.
+  const [creating, setCreating] = useState(null) // null | { dateKey, anchor, current }
+  const [draft, setDraft] = useState(null) // null | { dateKey, start, end }
 
   // --- redimensionar: arrastar a borda de cima ou de baixo do card muda o
   // horário de início ou término, mantendo a outra ponta fixa.
@@ -139,18 +182,29 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
   }, [weekStart])
 
   function handleDragStart(e, id) {
-    dragStart.current = { x: e.clientX, y: e.clientY }
-    setDrag({ id, dx: 0, dy: 0, dragging: true, moved: false })
+    const cardRect = e.currentTarget.getBoundingClientRect()
+    dragStart.current = { x: e.clientX, y: e.clientY, grab: e.clientY - cardRect.top }
+    setDrag({ id, dx: 0, dy: 0, dragging: true, moved: false, previewStart: null })
     e.currentTarget.setPointerCapture(e.pointerId)
   }
 
-  function handleDragMove(e, id) {
+  // horário de início correspondente à posição atual do topo do card
+  // (todas as colunas têm o mesmo topo, então qualquer uma serve de régua).
+  function startMinutesAtPointer(clientY, dateKey) {
+    const col = dayColumnRefs.current[dateKey]
+    if (!col) return null
+    const rect = col.getBoundingClientRect()
+    return pxToMinutes(clientY - dragStart.current.grab - rect.top)
+  }
+
+  function handleDragMove(e, id, ev) {
     const { clientX, clientY } = e
+    const previewStart = startMinutesAtPointer(clientY, ev.event_date)
     setDrag((d) => {
       if (!d.dragging || d.id !== id) return d
       const dx = clientX - dragStart.current.x
       const dy = clientY - dragStart.current.y
-      return { ...d, dx, dy, moved: d.moved || Math.hypot(dx, dy) > CLICK_THRESHOLD }
+      return { ...d, dx, dy, previewStart, moved: d.moved || Math.hypot(dx, dy) > CLICK_THRESHOLD }
     })
   }
 
@@ -207,10 +261,10 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
 
   function handleDragEnd(e, id, ev) {
     if (drag.id !== id || !drag.dragging) return
-    const { moved, dx, dy } = drag
+    const { moved } = drag
     const clientX = e.clientX
     const clientY = e.clientY
-    setDrag({ id: null, dx: 0, dy: 0, dragging: false, moved: false })
+    setDrag({ id: null, dx: 0, dy: 0, dragging: false, moved: false, previewStart: null })
 
     if (!moved) {
       openEditEvent(ev)
@@ -218,18 +272,51 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
     }
 
     const targetDateKey = targetDayKeyAt(clientX)
-    const columnEl = targetDateKey ? dayColumnRefs.current[targetDateKey] : null
-    if (!targetDateKey || !columnEl) return
-
-    const rect = columnEl.getBoundingClientRect()
-    const relativeY = clientY - rect.top
-    let minutes = Math.round((relativeY / HOUR_HEIGHT) * 60 / SNAP_MINUTES) * SNAP_MINUTES
-    minutes = Math.max(0, Math.min(minutes, 24 * 60 - SNAP_MINUTES))
+    if (!targetDateKey) return
+    const minutes = startMinutesAtPointer(clientY, targetDateKey)
+    if (minutes === null) return
     rescheduleEvent(ev, targetDateKey, minutes)
   }
 
   function handleDragCancel() {
-    setDrag({ id: null, dx: 0, dy: 0, dragging: false, moved: false })
+    setDrag({ id: null, dx: 0, dy: 0, dragging: false, moved: false, previewStart: null })
+  }
+
+  // --- criar arrastando (mouse/caneta; no toque o arraste rola a grade, e
+  // o dois toques continua valendo pra criar).
+  function handleCreateStart(e, dateKey) {
+    if (e.pointerType === 'touch' || e.button !== 0) return
+    if (e.target.closest('[data-event-card]')) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const anchor = pxToMinutes(e.clientY - rect.top, 24 * 60 - SNAP_MINUTES, Math.floor)
+    setCreating({ dateKey, anchor, current: anchor })
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handleCreateMove(e, dateKey) {
+    if (!creating || creating.dateKey !== dateKey) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const current = pxToMinutes(e.clientY - rect.top, 24 * 60)
+    if (current !== creating.current) setCreating({ ...creating, current })
+  }
+
+  // intervalo coberto pela seleção: sempre inclui o bloco de 15min onde o
+  // arraste começou, pra cima ou pra baixo.
+  function creatingRange(c) {
+    if (c.current > c.anchor) return { start: c.anchor, end: c.current }
+    return { start: c.current, end: c.anchor + SNAP_MINUTES }
+  }
+
+  function handleCreateEnd(dateKey) {
+    if (!creating || creating.dateKey !== dateKey) return
+    const c = creating
+    setCreating(null)
+    // sem movimento é só um clique: não cria nada (o dois cliques cuida disso)
+    if (c.current === c.anchor) return
+    const { start, end } = creatingRange(c)
+    const safeEnd = Math.min(end, 24 * 60 - 1)
+    setDraft({ dateKey, start, end })
+    openNewEvent(dateKey, formatMinutes(start), formatMinutes(safeEnd))
   }
 
   function handleResizeStart(e, id, edge) {
@@ -297,8 +384,8 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
   }
 
   // --- criar / editar ---
-  function openNewEvent(dateKey, time = '') {
-    setEventModal({ id: null, form: { title: '', description: '', date: dateKey, time, endTime: '', color: DEFAULT_EVENT_COLOR } })
+  function openNewEvent(dateKey, time = '', endTime = '') {
+    setEventModal({ id: null, form: { title: '', description: '', date: dateKey, time, endTime, color: DEFAULT_EVENT_COLOR } })
   }
 
   async function pasteEventAt(dateKey, timeStr) {
@@ -403,7 +490,7 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
       <p className="text-xs text-ink/40 px-4 py-1">
         {loading
           ? 'Carregando...'
-          : 'Dois cliques num horário vazio criam um compromisso. Arraste um compromisso pra mudar de dia/horário, ou pela borda de cima/baixo pra redimensionar.'}
+          : 'Arraste ou dê dois cliques num horário vazio pra criar um compromisso. Arraste um compromisso pra mudar de dia/horário, ou pela borda de cima/baixo pra redimensionar.'}
       </p>
 
       {clipboard && (
@@ -424,7 +511,9 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
       <div ref={scrollRef} className="flex-1 overflow-auto">
         <div className="flex w-full" style={{ minWidth: HOUR_COL_WIDTH + 7 * DAY_COL_WIDTH }}>
           <div className="sticky left-0 z-20 bg-base shrink-0" style={{ width: HOUR_COL_WIDTH }}>
-            <div className="sticky top-0 z-30 bg-base h-12 border-b border-line" />
+            <div className="sticky top-0 z-30 bg-base border-b border-line flex items-end justify-end pr-1 pb-1.5" style={{ height: headerHeight }}>
+              {maxAllDay > 0 && <span className="text-[9px] text-ink/30 leading-tight text-right">dia todo</span>}
+            </div>
             <div className="relative" style={{ height: HOUR_HEIGHT * 24 }}>
               {Array.from({ length: 24 }).map((_, h) => (
                 <div key={h} className="absolute left-0 right-1 text-right text-[10px] text-ink/30" style={{ top: h * HOUR_HEIGHT - 6 }}>
@@ -437,20 +526,51 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
           {days.map((date) => {
             const dateKey = toDateKey(date.getFullYear(), date.getMonth(), date.getDate())
             const isToday = dateKey === todayKey
-            const dayEvents = eventsByDate[dateKey] || []
+            const dayEvents = timedByDate[dateKey] || []
+            const allDayEvents = allDayByDate[dateKey] || []
+            const layout = layoutByDate[dateKey] || {}
+            const selection = creating?.dateKey === dateKey
+              ? creatingRange(creating)
+              : draft?.dateKey === dateKey && eventModal && !eventModal.id
+              ? draft
+              : null
             return (
               <div key={dateKey} className="flex-1 border-l border-line" style={{ minWidth: DAY_COL_WIDTH }}>
-                <div className="sticky top-0 z-10 bg-base h-12 border-b border-line flex flex-col items-center justify-center gap-0.5">
-                  <span className="text-[10px] text-ink/40">{WEEKDAY_LABELS[date.getDay()]}</span>
-                  <span className={`text-xs w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-ink text-base font-medium' : 'text-ink/80'}`}>
-                    {date.getDate()}
-                  </span>
+                <div className="sticky top-0 z-10 bg-base border-b border-line flex flex-col" style={{ height: headerHeight }}>
+                  <div className="h-12 shrink-0 flex flex-col items-center justify-center gap-0.5">
+                    <span className="text-[10px] text-ink/40">{WEEKDAY_LABELS[date.getDay()]}</span>
+                    <span className={`text-xs w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-ink text-base font-medium' : 'text-ink/80'}`}>
+                      {date.getDate()}
+                    </span>
+                  </div>
+                  {allDayEvents.length > 0 && (
+                    <div className="px-1 flex flex-col" style={{ gap: 2 }}>
+                      {allDayEvents.map((ev) => {
+                        const color = getEventColor(ev.color)
+                        return (
+                          <button
+                            key={ev.id}
+                            onClick={() => openEditEvent(ev)}
+                            title={ev.title}
+                            className={`rounded border px-1.5 text-left text-[10px] font-medium truncate leading-none ${color.card} ${color.text}`}
+                            style={{ height: ALL_DAY_ROW - 2 }}
+                          >
+                            {ev.title}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
                 <div
                   ref={(el) => { dayColumnRefs.current[dateKey] = el }}
-                  className="relative cursor-pointer"
+                  className="relative cursor-pointer select-none"
                   style={{ height: HOUR_HEIGHT * 24 }}
                   onDoubleClick={(e) => handleDayDoubleClick(e, dateKey)}
+                  onPointerDown={(e) => handleCreateStart(e, dateKey)}
+                  onPointerMove={(e) => handleCreateMove(e, dateKey)}
+                  onPointerUp={() => handleCreateEnd(dateKey)}
+                  onPointerCancel={() => setCreating(null)}
                 >
                   {Array.from({ length: 24 }).map((_, h) => (
                     <div key={h} className="absolute left-0 right-0 border-t border-line/50" style={{ top: h * HOUR_HEIGHT }} />
@@ -462,14 +582,24 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
                     </div>
                   )}
 
+                  {selection && (
+                    <div
+                      className="absolute left-1 right-1 z-20 rounded-md border-2 border-dashed border-ink/40 bg-ink/10 px-1.5 py-1 pointer-events-none"
+                      style={{
+                        top: (selection.start / 60) * HOUR_HEIGHT,
+                        height: ((selection.end - selection.start) / 60) * HOUR_HEIGHT,
+                      }}
+                    >
+                      <p className="text-[10px] font-medium text-ink/70 leading-tight">
+                        {formatMinutes(selection.start)}–{formatMinutes(Math.min(selection.end, 24 * 60 - 1))}
+                      </p>
+                    </div>
+                  )}
+
                   {dayEvents.map((ev) => {
-                    const start = parseTime(ev.event_time)
-                    if (!start) return null
-                    const startMinutes = start.hours * 60 + start.minutes
+                    const { start: startMinutes, end: endMinutes } = eventMinutes(ev)
                     const top = (startMinutes / (24 * 60)) * (HOUR_HEIGHT * 24)
-                    const end = parseTime(ev.event_end_time)
-                    const endMinutes = end ? end.hours * 60 + end.minutes : null
-                    const hasRange = endMinutes !== null && endMinutes > startMinutes
+                    const hasRange = endMinutes !== null
                     const height = hasRange
                       ? Math.max(((endMinutes - startMinutes) / (24 * 60)) * (HOUR_HEIGHT * 24), 24)
                       : 24
@@ -477,6 +607,7 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
                     const dx = isActiveDrag ? drag.dx : 0
                     const dy = isActiveDrag ? drag.dy : 0
                     const color = getEventColor(ev.color)
+                    const { col = 0, cols = 1 } = layout[ev.id] || {}
 
                     const isResizingThis = resize.id === ev.id && resize.active
                     const minPx = (SNAP_MINUTES / (24 * 60)) * (HOUR_HEIGHT * 24)
@@ -489,25 +620,41 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
                       displayHeight = Math.min(Math.max(height + resize.dy, minPx), HOUR_HEIGHT * 24 - top)
                     }
 
+                    // horário exibido: durante arraste/redimensionamento mostra
+                    // o horário que vai ficar ao soltar.
+                    let labelStart = startMinutes
+                    let labelEnd = endMinutes
+                    if (isActiveDrag && drag.moved && drag.previewStart !== null) {
+                      labelStart = drag.previewStart
+                      labelEnd = hasRange ? Math.min(drag.previewStart + (endMinutes - startMinutes), 24 * 60 - 1) : null
+                    } else if (isResizingThis) {
+                      labelStart = pxToMinutes(displayTop)
+                      labelEnd = Math.max(labelStart + SNAP_MINUTES, pxToMinutes(displayTop + displayHeight, 24 * 60))
+                    }
+                    const timeLabel = `${formatMinutes(labelStart)}${labelEnd !== null ? `–${formatMinutes(Math.min(labelEnd, 24 * 60 - 1))}` : ''}`
+
                     return (
                       <div
                         key={ev.id}
-                        className={`absolute left-1 right-1 rounded-md border px-1.5 py-1 overflow-hidden cursor-grab ${color.card} ${color.text} ${isActiveDrag || isResizingThis ? 'z-30 shadow-xl' : 'z-[5]'}`}
+                        data-event-card
+                        className={`absolute rounded-md border px-1.5 py-1 overflow-hidden cursor-grab ${color.card} ${color.text} ${isActiveDrag || isResizingThis ? 'z-30 shadow-xl' : 'z-[5]'}`}
                         style={{
                           top: displayTop,
                           height: displayHeight,
+                          left: `calc(4px + (100% - 8px) * ${col / cols})`,
+                          width: `calc((100% - 8px) / ${cols} - ${cols > 1 ? 2 : 0}px)`,
                           transform: isResizingThis ? undefined : `translate(${dx}px, ${dy}px) ${isActiveDrag ? 'scale(1.03)' : ''}`,
                           transition: isActiveDrag || isResizingThis ? 'none' : 'transform 0.2s ease',
                           touchAction: 'none',
                         }}
                         onPointerDown={(e) => handleDragStart(e, ev.id)}
-                        onPointerMove={(e) => handleDragMove(e, ev.id)}
+                        onPointerMove={(e) => handleDragMove(e, ev.id, ev)}
                         onPointerUp={(e) => handleDragEnd(e, ev.id, ev)}
                         onPointerCancel={handleDragCancel}
                       >
                         <p className="text-[10px] font-medium truncate leading-tight">{ev.title}</p>
-                        <p className="text-[9px] opacity-80 leading-tight">
-                          {ev.event_time.slice(0, 5)}{hasRange ? `–${ev.event_end_time.slice(0, 5)}` : ''}
+                        <p className={`text-[9px] leading-tight ${isActiveDrag || isResizingThis ? 'font-semibold' : 'opacity-80'}`}>
+                          {timeLabel}
                         </p>
                         <div
                           onPointerDown={(e) => handleResizeStart(e, ev.id, 'top')}
@@ -550,7 +697,7 @@ export default function WeekAgenda({ user, initialDate, clipboard, onCopyEvent, 
           onSave={handleSaveEvent}
           onDelete={eventModal.id ? () => handleDeleteEvent(eventModal.id) : null}
           onCopy={onCopyEvent}
-          onClose={() => setEventModal(null)}
+          onClose={() => { setEventModal(null); setDraft(null) }}
         />
       )}
     </div>
