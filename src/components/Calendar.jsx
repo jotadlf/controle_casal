@@ -9,7 +9,7 @@ import Kanban from './Kanban'
 import WeekAgenda from './WeekAgenda'
 import { getEventColor, DEFAULT_EVENT_COLOR } from '../lib/eventColors'
 import { layoutOverlappingEvents } from '../lib/eventLayout'
-import { pickEventFields, clipboardFromEvent } from '../lib/calendarEvents'
+import { pickEventFields, clipboardFromEvent, reminderToForm, reminderFromForm, DEFAULT_REMINDER } from '../lib/calendarEvents'
 import { useUndo } from '../lib/useUndo'
 import UndoToast from './UndoToast'
 
@@ -157,6 +157,7 @@ export default function CalendarView({ user }) {
         time: ev.event_time ? ev.event_time.slice(0, 5) : '',
         endTime: ev.event_end_time ? ev.event_end_time.slice(0, 5) : '',
         color: ev.color || DEFAULT_EVENT_COLOR,
+        reminder: reminderToForm(ev.reminder_minutes),
       },
     })
   }
@@ -191,6 +192,7 @@ export default function CalendarView({ user }) {
       event_time: clipboard.time || null,
       event_end_time: clipboard.time ? clipboard.endTime || null : null,
       color: clipboard.color || DEFAULT_EVENT_COLOR,
+      reminder_minutes: reminderFromForm(clipboard.reminder ?? DEFAULT_REMINDER, Boolean(clipboard.time)),
     }
     await handleSaveEvent(payload, null)
   }

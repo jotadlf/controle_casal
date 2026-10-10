@@ -70,6 +70,37 @@ https://SEU-USUARIO.github.io/casa-app/
 Acesse esse link no celular de cada um e adicionem à tela inicial — funciona
 como um app.
 
+## 6. Notificações de compromissos (Android)
+
+Cada compromisso com horário tem um campo **Lembrar** (padrão: 15 min
+antes). O lembrete chega como notificação no celular do dono do
+compromisso, mesmo com o app fechado. Funciona no Chrome do Android, de
+preferência com o app instalado na tela inicial.
+
+1. **Banco:** no SQL Editor do Supabase, rode `supabase/notifications.sql`.
+   Faça isso antes de publicar o app com o campo "Lembrar".
+2. **Chaves VAPID** (uma vez só):
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+   - A **Public Key** vai no `.env` como `VITE_VAPID_PUBLIC_KEY` e como
+     segredo `VITE_VAPID_PUBLIC_KEY` no GitHub (mesmo lugar da seção 4).
+   - A **Private Key** fica só no Supabase (próximo passo). Não coloque no
+     código nem no GitHub.
+3. **Edge Function** (precisa da [Supabase CLI](https://supabase.com/docs/guides/cli)):
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref SEU-PROJETO
+   npx supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:seu@email.com
+   npx supabase functions deploy send-reminders
+   ```
+4. **Agendamento:** em **Database → Extensions**, ative `pg_cron` e
+   `pg_net`. Depois rode o trecho comentado no final de
+   `supabase/notifications.sql`, trocando a URL e a anon key. Ele chama a
+   função a cada minuto.
+5. **No celular:** abra o app e toque no sino 🔔 do cabeçalho pra permitir
+   as notificações. Cada um faz isso no próprio aparelho.
+
 ## Observações importantes
 
 - **Repositório privado é recomendado.** Se for público, qualquer pessoa que
