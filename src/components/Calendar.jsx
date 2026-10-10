@@ -9,6 +9,9 @@ import Kanban from './Kanban'
 import WeekAgenda from './WeekAgenda'
 import { getEventColor, DEFAULT_EVENT_COLOR } from '../lib/eventColors'
 import { layoutOverlappingEvents } from '../lib/eventLayout'
+import { pickEventFields, clipboardFromEvent } from '../lib/calendarEvents'
+import { useUndo } from '../lib/useUndo'
+import UndoToast from './UndoToast'
 
 const VIEWS = [
   { key: 'calendario', label: 'Calendário' },
@@ -17,6 +20,9 @@ const VIEWS = [
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 const HOUR_HEIGHT = 48 // px
+const MONTH_CHIPS = 2 // compromissos visíveis por dia no mês; o resto vira "+N"
+const LONG_PRESS_MS = 350
+const DRAG_THRESHOLD = 5
 
 function monthLabel(date) {
   const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
@@ -48,6 +54,7 @@ export default function CalendarView({ user }) {
   const timelineRef = useRef(null)
   const [highPriorityTasks, setHighPriorityTasks] = useState([])
   const [clipboard, setClipboard] = useState(null)
+  const undo = useUndo({ enabled: !showWeekAgenda && !eventModal })
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60000)
@@ -194,6 +201,133 @@ export default function CalendarView({ user }) {
     setEvents((prev) => prev.filter((e) => e.id !== id))
     setActiveEventId(null)
     if (removed?.event_date === todayKey) refreshAppBadge(user)
+    if (!removed) return
+    undo.push(`"${removed.title}" excluído`, async () => {
+      const { data, error } = await supabase
+        .from('calendar_events')
+        .insert({ ...pickEventFields(removed), created_by: removed.created_by || user })
+        .select()
+        .single()
+      if (error) {
+        console.error('Falha ao desfazer exclusão:', error)
+        return
+      }
+      setEvents((prev) => [...prev, data])
+      refreshAppBadge(user)
+    })
+  }
+
+  // muda o dia de um compromisso (arrastado no mês), com "desfazer"
+  async function moveEventToDate(ev, dateKey) {
+    const previousDate = ev.event_date
+    setEvents((prev) => prev.map((e) => (e.id === ev.id ? { ...e, event_date: dateKey } : e)))
+    const { error } = await supabase.from('calendar_events').update({ event_date: dateKey }).eq('id', ev.id)
+    if (error) {
+      console.error('Falha ao mover compromisso:', error)
+      loadEvents()
+      return
+    }
+    refreshAppBadge(user)
+    undo.push(`"${ev.title}" movido`, async () => {
+      setEvents((prev) => prev.map((e) => (e.id === ev.id ? { ...e, event_date: previousDate } : e)))
+      const { error: undoError } = await supabase.from('calendar_events').update({ event_date: previousDate }).eq('id', ev.id)
+      if (undoError) loadEvents()
+      refreshAppBadge(user)
+    })
+  }
+
+  // cria uma cópia do compromisso em outro dia (Alt + arrastar no mês)
+  async function duplicateEventToDate(ev, dateKey) {
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .insert({ ...pickEventFields(ev), event_date: dateKey, created_by: user })
+      .select()
+      .single()
+    if (error) {
+      console.error('Falha ao duplicar compromisso:', error)
+      return
+    }
+    setEvents((prev) => [...prev, data])
+    refreshAppBadge(user)
+    undo.push(`"${ev.title}" duplicado`, async () => {
+      await supabase.from('calendar_events').delete().eq('id', data.id)
+      setEvents((prev) => prev.filter((e) => e.id !== data.id))
+      refreshAppBadge(user)
+    })
+  }
+
+  // --- arrastar compromissos entre dias no mês. Mouse/caneta: arrasta
+  // direto. Toque: segura um instante (long press) e arrasta, pra não
+  // atrapalhar a rolagem da página. Com Alt, solta uma cópia.
+  const press = useRef(null) // null | { ev, x, y, pointerType, timer }
+  const suppressClickUntil = useRef(0)
+  const [monthDrag, setMonthDrag] = useState(null) // null | { ev, x, y, targetKey, duplicate }
+
+  function dateKeyAtPoint(x, y) {
+    const el = document.elementFromPoint(x, y)
+    return el?.closest('[data-date-key]')?.getAttribute('data-date-key') || null
+  }
+
+  function activateMonthDrag(p, x, y, altKey) {
+    if (p.pointerType === 'touch') navigator.vibrate?.(10)
+    setMonthDrag({ ev: p.ev, x, y, targetKey: dateKeyAtPoint(x, y), duplicate: altKey })
+  }
+
+  function handleChipPointerDown(e, ev) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    const p = { ev, x: e.clientX, y: e.clientY, pointerType: e.pointerType, timer: null }
+    if (e.pointerType === 'touch') {
+      const { clientX, clientY } = e
+      p.timer = setTimeout(() => activateMonthDrag(p, clientX, clientY, false), LONG_PRESS_MS)
+    } else {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    }
+    press.current = p
+  }
+
+  function handleChipPointerMove(e) {
+    const p = press.current
+    if (!p) return
+    if (!monthDrag) {
+      const dist = Math.hypot(e.clientX - p.x, e.clientY - p.y)
+      if (dist <= DRAG_THRESHOLD) return
+      if (p.pointerType === 'touch') {
+        // mexeu antes do long press: é rolagem, não arraste
+        clearTimeout(p.timer)
+        press.current = null
+        return
+      }
+      activateMonthDrag(p, e.clientX, e.clientY, e.altKey)
+      return
+    }
+    setMonthDrag((d) => d && { ...d, x: e.clientX, y: e.clientY, targetKey: dateKeyAtPoint(e.clientX, e.clientY), duplicate: e.altKey })
+  }
+
+  function endMonthDrag(e, cancelled = false) {
+    const p = press.current
+    if (p) clearTimeout(p.timer)
+    press.current = null
+    const d = monthDrag
+    setMonthDrag(null)
+    if (!d) return
+    suppressClickUntil.current = Date.now() + 400
+    if (cancelled) return
+    const targetKey = dateKeyAtPoint(e.clientX, e.clientY) || d.targetKey
+    if (!targetKey) return
+    if (e.altKey || d.duplicate) duplicateEventToDate(d.ev, targetKey)
+    else if (targetKey !== d.ev.event_date) moveEventToDate(d.ev, targetKey)
+  }
+
+  // durante o arraste no toque, impede a página de rolar
+  useEffect(() => {
+    if (!monthDrag) return
+    const prevent = (e) => e.preventDefault()
+    document.addEventListener('touchmove', prevent, { passive: false })
+    return () => document.removeEventListener('touchmove', prevent)
+  }, [Boolean(monthDrag)])
+
+  function clicksSuppressed() {
+    return Date.now() < suppressClickUntil.current
   }
 
   function changeMonth(delta) {
@@ -256,7 +390,7 @@ export default function CalendarView({ user }) {
                   <ChevronRight size={16} />
                 </button>
                 <button
-                  onClick={() => setShowWeekAgenda(true)}
+                  onClick={() => { undo.dismiss(); setShowWeekAgenda(true) }}
                   aria-label="Expandir pra visão de semana"
                   title="Expandir pra visão de semana"
                   className="p-1.5 rounded-full text-ink/50 hover:bg-ink/5"
@@ -266,43 +400,100 @@ export default function CalendarView({ user }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-7 gap-y-0.5 text-center">
+            <div className="grid grid-cols-7 text-center">
               {WEEKDAYS.map((w, i) => (
                 <span key={i} className="text-[10px] text-ink/40 pb-1">
                   {w}
                 </span>
               ))}
+            </div>
 
+            <div className="grid grid-cols-7 border-l border-line/60">
               {cells.map((dateKey, i) => {
-                if (!dateKey) return <span key={i} />
+                if (!dateKey) return <span key={i} className="border-t border-r border-line/60 bg-ink/[0.02]" />
                 const day = Number(dateKey.slice(-2))
                 const isToday = dateKey === todayKey
-                const dayEventsList = eventsByDate[dateKey]
-                const hasEvents = Boolean(dayEventsList?.length)
-                const dotColor = hasEvents ? getEventColor(dayEventsList[0].color).dot : 'bg-transparent'
+                // dia todo primeiro, depois por horário
+                const dayEventsList = [...(eventsByDate[dateKey] || [])].sort((a, b) =>
+                  (a.event_time || '').localeCompare(b.event_time || ''),
+                )
+                const visible = dayEventsList.slice(0, MONTH_CHIPS)
+                const hidden = dayEventsList.length - visible.length
                 const isSelected = dateKey === selectedDate
+                const isDropTarget = monthDrag?.targetKey === dateKey
                 return (
-                  <button
+                  <div
                     key={i}
-                    onClick={() => openDate(dateKey)}
-                    className="flex flex-col items-center gap-0.5 py-0.5"
+                    data-date-key={dateKey}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { if (!clicksSuppressed()) openDate(dateKey) }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') openDate(dateKey) }}
+                    className={`min-h-[68px] border-t border-r border-line/60 px-0.5 pt-0.5 pb-1 flex flex-col items-stretch gap-0.5 cursor-pointer transition-colors ${
+                      isDropTarget ? 'bg-teal-light/60' : 'hover:bg-ink/[0.03]'
+                    }`}
                   >
                     <span
-                      className={`w-7 h-7 flex items-center justify-center rounded-full text-xs transition-all duration-300 ${
+                      className={`self-center w-6 h-6 flex items-center justify-center rounded-full text-xs transition-all duration-300 ${
                         isToday
                           ? 'bg-ink text-base font-medium'
                           : isSelected
                           ? 'bg-teal-light text-teal-dark font-medium'
-                          : 'text-ink/80 hover:bg-ink/5'
+                          : 'text-ink/80'
                       }`}
                     >
                       {day}
                     </span>
-                    <span className={`w-1 h-1 rounded-full ${dotColor}`} />
-                  </button>
+                    {visible.map((ev) => {
+                      const color = getEventColor(ev.color)
+                      const isDragged = monthDrag?.ev.id === ev.id && !monthDrag.duplicate
+                      return (
+                        <button
+                          key={ev.id}
+                          type="button"
+                          title={ev.event_time ? `${ev.event_time.slice(0, 5)} · ${ev.title}` : ev.title}
+                          onPointerDown={(e) => handleChipPointerDown(e, ev)}
+                          onPointerMove={handleChipPointerMove}
+                          onPointerUp={(e) => endMonthDrag(e)}
+                          onPointerCancel={(e) => endMonthDrag(e, true)}
+                          onContextMenu={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            // no mouse, clicar no compromisso abre a edição; no
+                            // toque, o clique segue pro dia (abre a agenda do dia)
+                            if (clicksSuppressed()) { e.stopPropagation(); return }
+                            if (e.nativeEvent.pointerType && e.nativeEvent.pointerType !== 'mouse') return
+                            e.stopPropagation()
+                            openEditEventForm(ev)
+                          }}
+                          className={`w-full truncate rounded-sm border px-1 text-left text-[9px] leading-[13px] font-medium select-none cursor-grab ${color.card} ${color.text} ${
+                            isDragged ? 'opacity-40' : ''
+                          }`}
+                          style={{ WebkitTouchCallout: 'none' }}
+                        >
+                          {ev.event_time && <span className="hidden sm:inline opacity-70">{ev.event_time.slice(0, 5)} </span>}
+                          {ev.title}
+                        </button>
+                      )
+                    })}
+                    {hidden > 0 && <span className="text-[9px] text-ink/40 leading-tight">+{hidden}</span>}
+                  </div>
                 )
               })}
             </div>
+
+            {monthDrag && (
+              <div
+                className={`fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-1/2 rounded border px-2 py-0.5 text-[10px] font-medium shadow-lg max-w-[40vw] truncate ${getEventColor(monthDrag.ev.color).card} ${getEventColor(monthDrag.ev.color).text}`}
+                style={{ left: monthDrag.x, top: monthDrag.y }}
+              >
+                {monthDrag.duplicate && <span className="font-bold">+ </span>}
+                {monthDrag.ev.title}
+              </div>
+            )}
+
+            <p className="text-[10px] text-ink/30 mt-2">
+              Arraste um compromisso pra outro dia (no celular, segure antes de arrastar). Com Alt, duplica.
+            </p>
 
             {loading && <p className="text-xs text-ink/40 mt-2">Carregando...</p>}
           </div>
@@ -472,13 +663,7 @@ export default function CalendarView({ user }) {
                                   <div className="flex items-center gap-1">
                                     <button
                                       onClick={() => {
-                                        setClipboard({
-                                          title: ev.title,
-                                          description: ev.description || '',
-                                          time: ev.event_time ? ev.event_time.slice(0, 5) : '',
-                                          endTime: ev.event_end_time ? ev.event_end_time.slice(0, 5) : '',
-                                          color: ev.color || DEFAULT_EVENT_COLOR,
-                                        })
+                                        setClipboard(clipboardFromEvent(ev))
                                         setActiveEventId(null)
                                       }}
                                       aria-label="Copiar compromisso"
@@ -533,6 +718,8 @@ export default function CalendarView({ user }) {
           )}
         </>
       )}
+
+      <UndoToast undo={undo} />
 
       {showWeekAgenda && (
         <WeekAgenda
