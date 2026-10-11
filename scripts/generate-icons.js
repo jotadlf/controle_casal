@@ -138,8 +138,11 @@ function compose(src, alpha, round) {
     // iOS ignores transparency and always rounds the corners itself, so it
     // gets the full square version
     await writePng(resize(full, 180), outDir + '/apple-touch-icon.png')
+    // logo do cabeçalho: importado pelo app, então o Vite põe um hash no nome
+    // e o navegador não fica preso numa versão antiga em cache
+    await writePng(resize(round, 192), './src/assets/app-icon.png')
 
-    console.log('Icons generated: icon-192.png, icon-512.png, icon-192-maskable.png, icon-512-maskable.png, apple-touch-icon.png')
+    console.log('Icons generated: icon-192.png, icon-512.png, icon-192-maskable.png, icon-512-maskable.png, apple-touch-icon.png, src/assets/app-icon.png')
   } catch (e) {
     console.error(e)
     process.exit(1)

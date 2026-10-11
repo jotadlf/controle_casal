@@ -5,6 +5,7 @@ import ShoppingList from './components/ShoppingList'
 import RepairRequests from './components/RepairRequests'
 import Movies from './components/Movies'
 import { useTheme } from './lib/theme'
+import appIcon from './assets/app-icon.png'
 
 const TABS = [
   { key: 'tarefas', label: 'Tarefas', icon: ListChecks, Component: RepairRequests },
@@ -45,7 +46,7 @@ export default function App() {
     <div className="min-h-screen bg-base pb-24 sm:pb-0">
       <header className="border-b border-line bg-card sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="Casa" className="h-9 w-9" />
+          <img src={appIcon} alt="Casa" className="h-9 w-9" />
           <div className="flex items-center gap-2">
             {showInstall && (
               <button
@@ -114,7 +115,7 @@ function NamePicker({ onPick }) {
   return (
     <div className="min-h-screen bg-base flex items-center justify-center px-4">
         <div className="bg-card border border-line rounded-card p-8 max-w-sm w-full text-center space-y-4">
-        <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="Casa" className="h-14 w-14 mx-auto" />
+        <img src={appIcon} alt="Casa" className="h-14 w-14 mx-auto" />
         <p className="text-sm text-ink/60">Quem é você?</p>
         <div className="flex flex-col gap-2">
           {['Jairon', 'Bruna'].map((name) => (
