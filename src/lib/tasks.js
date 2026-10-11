@@ -13,8 +13,7 @@ function parseDue(raw) {
 }
 
 // Carrega as tarefas (repair_requests) e escalona pra prioridade alta as
-// que estão pendentes há mais de 4 dias sem ser tocadas. Compartilhado
-// entre a aba Tarefas e o Kanban do calendário, que exibem os mesmos dados.
+// que estão pendentes há mais de 4 dias sem ser tocadas.
 export async function loadTasks() {
   const { data, error } = await supabase.from('repair_requests').select('*').order('id', { ascending: false })
   if (error) return { tasks: [], error }

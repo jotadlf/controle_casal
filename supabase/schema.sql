@@ -18,29 +18,6 @@ alter table shopping_purchases
   alter column price drop not null,
   alter column unit drop not null;
 
--- Tabela de eventos do calendário (consultas, compromissos etc).
-create table if not exists calendar_events (
-  id bigint generated always as identity primary key,
-  title text not null,
-  description text,
-  event_date date not null,
-  event_time time,
-  created_by text,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists calendar_events_event_date_idx on calendar_events (event_date);
-
--- Horário de término (opcional): quando preenchido, o compromisso "cobre"
--- o intervalo entre event_time e event_end_time na agenda do dia.
-alter table calendar_events
-  add column if not exists event_end_time time;
-
--- Cor do compromisso, usada pra colorir o card na agenda (dia/semana).
--- Chave de uma paleta fixa definida em src/lib/eventColors.js.
-alter table calendar_events
-  add column if not exists color text not null default 'sky';
-
 -- Simplificação da lista de compras: removidos preço/quantidade/unidade e
 -- sessão de compras (mercado + total + criação automática de conta), já
 -- que o frontend não usa mais nada disso. Remove também on_list, campo

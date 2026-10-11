@@ -1,22 +1,19 @@
 import { useState, useEffect } from 'react'
-import { ShoppingCart, ListChecks, Calendar, Clapperboard, Sun, Moon } from 'lucide-react'
+import { ShoppingCart, ListChecks, Clapperboard, Sun, Moon } from 'lucide-react'
 import UserSwitch, { useCurrentUser } from './components/UserSwitch'
 import ShoppingList from './components/ShoppingList'
 import RepairRequests from './components/RepairRequests'
-import CalendarView from './components/Calendar'
 import Movies from './components/Movies'
-import { refreshAppBadge } from './lib/badge'
 import { useTheme } from './lib/theme'
 
 const TABS = [
-  { key: 'calendario', label: 'Calendário', icon: Calendar, Component: CalendarView },
   { key: 'tarefas', label: 'Tarefas', icon: ListChecks, Component: RepairRequests },
   { key: 'compras', label: 'Compras', icon: ShoppingCart, Component: ShoppingList },
   { key: 'filmes', label: 'Filmes', icon: Clapperboard, Component: Movies },
 ]
 
 export default function App() {
-  const [tab, setTab] = useState('calendario')
+  const [tab, setTab] = useState('tarefas')
   const [user, setUser] = useCurrentUser()
   const [theme, setTheme] = useTheme()
   const [deferredPrompt, setDeferredPrompt] = useState(null)
@@ -32,19 +29,11 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
+  // o calendário (que mostrava no ícone os compromissos do dia) saiu do app;
+  // limpa o número que tenha ficado no ícone de instalações antigas
   useEffect(() => {
-    if (!user) return
-    refreshAppBadge(user)
-    const handler = () => {
-      if (document.visibilityState === 'visible') refreshAppBadge(user)
-    }
-    document.addEventListener('visibilitychange', handler)
-    window.addEventListener('focus', handler)
-    return () => {
-      document.removeEventListener('visibilitychange', handler)
-      window.removeEventListener('focus', handler)
-    }
-  }, [user])
+    if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(() => {})
+  }, [])
 
   if (!user) {
     return <NamePicker onPick={setUser} />
