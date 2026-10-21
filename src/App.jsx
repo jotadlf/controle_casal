@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { ShoppingCart, ListChecks, Clapperboard, Sun, Moon } from 'lucide-react'
+import { ShoppingCart, ListChecks, Clapperboard, Car, Sun, Moon } from 'lucide-react'
 import UserSwitch, { useCurrentUser } from './components/UserSwitch'
 import ShoppingList from './components/ShoppingList'
 import RepairRequests from './components/RepairRequests'
 import Movies from './components/Movies'
+import Trip, { isTripTabVisible } from './components/Trip'
 import { useTheme } from './lib/theme'
 import appIcon from './assets/app-icon.png'
 
@@ -11,6 +12,8 @@ const TABS = [
   { key: 'tarefas', label: 'Tarefas', icon: ListChecks, Component: RepairRequests },
   { key: 'compras', label: 'Compras', icon: ShoppingCart, Component: ShoppingList },
   { key: 'filmes', label: 'Filmes', icon: Clapperboard, Component: Movies },
+  // aba temporária: some depois de 30/12
+  { key: 'viagem', label: 'Viagem', icon: Car, Component: Trip, visible: isTripTabVisible },
 ]
 
 export default function App() {
@@ -40,7 +43,8 @@ export default function App() {
     return <NamePicker onPick={setUser} />
   }
 
-  const Active = TABS.find((t) => t.key === tab).Component
+  const tabs = TABS.filter((t) => !t.visible || t.visible())
+  const Active = (tabs.find((t) => t.key === tab) || tabs[0]).Component
 
   return (
     <div className="min-h-screen bg-base pb-24 sm:pb-0">
@@ -74,7 +78,7 @@ export default function App() {
           </div>
         </div>
         <nav className="max-w-3xl mx-auto px-4 hidden sm:flex gap-1 -mb-px justify-center">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
@@ -93,7 +97,7 @@ export default function App() {
       </main>
 
       <nav className="fixed bottom-0 inset-x-0 bg-card border-t border-line flex sm:hidden z-10">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
