@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Minus, Check, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Minus, Check, Pencil, X, ChevronLeft, ChevronRight, CalendarPlus } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { toISODate } from '../lib/tasks'
 import { filterChipClass } from './RepairRequests'
@@ -154,6 +154,7 @@ export default function Habits({ user }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [view, setView] = useState('mes')
   const [monthOffset, setMonthOffset] = useState(0) // 0 = mês atual, -1 = mês passado...
+  const [pastDay, setPastDay] = useState(null) // { habitId, day, count, error } do formulário de outra data
 
   const now = new Date()
   const todayISO = toISODate(now)
@@ -161,6 +162,8 @@ export default function Habits({ user }) {
   const month = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
   const weekStartISO = weeks[weeks.length - 1][0].iso
   const formType = TYPES.find((t) => t.key === form.frequency)
+  const pastDayHabit = pastDay && habits.find((h) => h.id === pastDay.habitId)
+  const pastDayRepeats = pastDayHabit?.frequency === 'varias_vezes'
 
   useEffect(() => {
     if (!alert) return
@@ -218,6 +221,35 @@ export default function Habits({ user }) {
 
   function tapDay(habit, day) {
     setDayCount(habit, day, nextCount(habit, countsByDay(habit).get(day) || 0))
+  }
+
+  function openPastDay(habit) {
+    const day = toISODate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))
+    setPastDay({ habitId: habit.id, day, count: countsByDay(habit).get(day) || 0, error: '' })
+  }
+
+  function changePastDay(day) {
+    setPastDay({ ...pastDay, day, count: countsByDay(pastDayHabit).get(day) || 0, error: '' })
+  }
+
+  // leva a visualização de mês até a data marcada, pra ver o resultado na grade
+  function showMonthOf(day) {
+    const [year, monthNumber] = day.split('-').map(Number)
+    setMonthOffset((year - now.getFullYear()) * 12 + (monthNumber - 1 - now.getMonth()))
+  }
+
+  async function savePastDay(count) {
+    if (!pastDay.day || pastDay.day > todayISO) {
+      setPastDay({ ...pastDay, error: 'Escolha uma data até hoje.' })
+      return
+    }
+    if (!Number.isInteger(count) || count < 0) {
+      setPastDay({ ...pastDay, error: 'Informe quantas vezes, de 0 em diante.' })
+      return
+    }
+    await setDayCount(pastDayHabit, pastDay.day, count)
+    showMonthOf(pastDay.day)
+    setPastDay(null)
   }
 
   function openNewForm() {
@@ -382,6 +414,14 @@ export default function Habits({ user }) {
                     >
                       <Pencil size={14} />
                     </button>
+                    <button
+                      onClick={() => openPastDay(habit)}
+                      aria-label={`Marcar ${habit.name} em outra data`}
+                      title="Marcar em outra data"
+                      className="p-1.5 text-ink/30 hover:text-ink/60 rounded-full"
+                    >
+                      <CalendarPlus size={14} />
+                    </button>
                     {repeats && (
                       <button
                         onClick={() => setDayCount(habit, todayISO, todayCount - 1)}
@@ -413,6 +453,55 @@ export default function Habits({ user }) {
             )
           })}
         </ul>
+      )}
+
+      {pastDayHabit && (
+        <Modal
+          title={pastDayHabit.name}
+          onClose={() => setPastDay(null)}
+          footer={
+            <div className="flex gap-2">
+              <button onClick={() => setPastDay(null)} className="flex-1 py-2 rounded-full border border-line text-sm">
+                Cancelar
+              </button>
+              <button
+                onClick={() => savePastDay(pastDayRepeats ? Number(pastDay.count) : pastDay.count ? 0 : 1)}
+                className="flex-1 py-2 rounded-full bg-ink text-base text-sm font-medium"
+              >
+                {pastDayRepeats ? 'Salvar' : pastDay.count ? 'Desmarcar' : 'Marcar como feito'}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <label className="block">
+              <span className="block text-xs text-ink/60 mb-1 px-1">Data</span>
+              <input
+                type="date"
+                value={pastDay.day}
+                max={todayISO}
+                onChange={(e) => changePastDay(e.target.value)}
+                className="w-full rounded-full border border-line px-4 py-2 text-sm bg-card"
+              />
+            </label>
+            {pastDayRepeats ? (
+              <label className="block">
+                <span className="block text-xs text-ink/60 mb-1 px-1">Vezes nesse dia (meta: {pastDayHabit.target})</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={pastDay.count}
+                  onChange={(e) => setPastDay({ ...pastDay, count: e.target.value, error: '' })}
+                  className="w-24 rounded-full border border-line px-4 py-2 text-sm"
+                />
+              </label>
+            ) : (
+              pastDay.count > 0 && <p className="text-xs text-ink/60 px-1">Esse dia já está marcado como feito.</p>
+            )}
+            {pastDay.error && <p className="text-xs text-coral px-1">{pastDay.error}</p>}
+          </div>
+        </Modal>
       )}
 
       {showForm && (
