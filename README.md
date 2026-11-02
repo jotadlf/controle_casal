@@ -92,6 +92,8 @@ src/
   lib/             → lógica de previsão + cliente Supabase
 supabase/
   schema.sql       → schema completo do banco (rodar uma vez)
+  subtasks.sql     → tabela de microtarefas das tarefas
+  habits.sql       → tabelas de hábitos e dias cumpridos
   remove_bills_and_car.sql → remove dados e tabelas de contas e carro
   remove_calendar.sql → remove a tabela de compromissos do calendário
 .github/workflows/ → deploy automático pro GitHub Pages

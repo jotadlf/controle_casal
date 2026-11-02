@@ -37,3 +37,9 @@ alter table shopping_items
 
 -- Filmes (aba "Filmes"): a tabela "movies" e a lista do Top 250 do IMDB
 -- ficam em supabase/movies.sql. Rode aquele arquivo também.
+
+-- Microtarefas (aba "Tarefas"): a tabela "repair_subtasks" fica em
+-- supabase/subtasks.sql. Rode aquele arquivo também.
+
+-- Hábitos (aba "Hábitos"): as tabelas "habits" e "habit_logs" ficam em
+-- supabase/habits.sql. Rode aquele arquivo também.

@@ -239,7 +239,7 @@ export default function ShoppingList({ user }) {
                 </div>
 
                 <div
-                  className="relative bg-card rounded-card border border-line flex items-center justify-between gap-3 px-4 py-3"
+                  className="relative bg-card rounded-card border border-line flex items-center justify-between gap-3 px-4 py-1"
                   style={{
                     transform: `translateX(${dragX}px)`,
                     transition: isActiveDrag ? 'none' : 'transform 0.2s ease',
@@ -250,7 +250,7 @@ export default function ShoppingList({ user }) {
                   onPointerUp={(e) => handleDragEnd(e, item.id, item)}
                   onPointerCancel={() => setDrag({ id: null, x: 0, dragging: false })}
                 >
-                  <p className={`font-medium truncate ${alreadyBoughtToday ? 'text-ink/40 line-through' : 'text-ink'}`}>
+                  <p className={`text-sm font-medium truncate ${alreadyBoughtToday ? 'text-ink/40 line-through' : 'text-ink'}`}>
                     {item.name}
                   </p>
                   <button
