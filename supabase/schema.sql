@@ -40,6 +40,3 @@ alter table shopping_items
 
 -- Microtarefas (aba "Tarefas"): a tabela "repair_subtasks" fica em
 -- supabase/subtasks.sql. Rode aquele arquivo também.
-
--- Hábitos (aba "Hábitos"): as tabelas "habits" e "habit_logs" ficam em
--- supabase/habits.sql. Rode aquele arquivo também.

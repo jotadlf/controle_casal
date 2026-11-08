@@ -93,7 +93,7 @@ src/
 supabase/
   schema.sql       → schema completo do banco (rodar uma vez)
   subtasks.sql     → tabela de microtarefas das tarefas
-  habits.sql       → tabelas de hábitos e dias cumpridos
+  remove_habits.sql → remove as tabelas de hábitos
   remove_bills_and_car.sql → remove dados e tabelas de contas e carro
   remove_calendar.sql → remove a tabela de compromissos do calendário
 .github/workflows/ → deploy automático pro GitHub Pages

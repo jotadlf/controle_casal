@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
-import { ShoppingCart, ListChecks, Grid3x3, Clapperboard, Car, Sun, Moon } from 'lucide-react'
+import { ShoppingCart, ListChecks, Clapperboard, Car, Sun, Moon } from 'lucide-react'
 import UserSwitch, { useCurrentUser } from './components/UserSwitch'
 import ShoppingList from './components/ShoppingList'
 import RepairRequests from './components/RepairRequests'
-import Habits from './components/Habits'
 import Movies from './components/Movies'
 import Trip, { isTripTabVisible } from './components/Trip'
 import { useTheme } from './lib/theme'
@@ -11,7 +10,6 @@ import appIcon from './assets/app-icon.png'
 
 const TABS = [
   { key: 'tarefas', label: 'Tarefas', icon: ListChecks, Component: RepairRequests },
-  { key: 'habitos', label: 'Hábitos', icon: Grid3x3, Component: Habits },
   { key: 'compras', label: 'Compras', icon: ShoppingCart, Component: ShoppingList },
   { key: 'filmes', label: 'Filmes', icon: Clapperboard, Component: Movies },
   // aba temporária: some depois de 30/12
